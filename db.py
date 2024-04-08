@@ -16,7 +16,7 @@ Path("database") \
 # "database/main.db" specifies the database file
 # change it if you wish
 # turn echo = True to display the sql output
-engine = create_engine("sqlite:///database/main.db", echo=False)
+engine = create_engine("sqlite:///database/main.db", echo=True)
 
 # initializes the database
 Base.metadata.create_all(engine)
