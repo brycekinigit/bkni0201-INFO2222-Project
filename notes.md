@@ -1,5 +1,9 @@
 # Notes
 
+We need to find out how exactly messages are sent. Peer to peer is vulnerable to impersonation, and seems to be how the template is. Server-side would only allow connection if both sides authenticate
+
+When a user logs in, the server sends a rendered version of the home page. The home page can then use some jevascript functions to send info to the server, which it passes on to the other client
+
 ## Current vulnerabilities
 
 - Anyone can put any username into address bar and access any other user
