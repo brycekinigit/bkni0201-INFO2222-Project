@@ -9,13 +9,13 @@ from flask_socketio import SocketIO
 import db
 import secrets
 
-import cherrypy
+import logging
 
-# import logging
+# import cherrypy
 
 # this turns off Flask Logging, uncomment this to turn off Logging
-# log = logging.getLogger('werkzeug')
-# log.setLevel(logging.ERROR)
+log = logging.getLogger('werkzeug')
+log.setLevel(logging.ERROR)
 
 app = Flask(__name__)
 
@@ -103,16 +103,20 @@ def friends():
         abort(404)
     return render_template("friends.jinja", username=user.username, friends=user.password)
 
-cherrypy.tree.graft(app.wsgi_app, '/')
-cherrypy.config.update({
-    'server.socket_host': '127.0.0.1',
-    'server.socket_port': 5000,
-    'engine.autoreload.on': False,
-    'server.ssl_module': 'builtin',
-    'server.ssl_certificate': 'certs/info2222CA.pem',
-    'server.ssl_private_key': 'certs/info2222CA.key',
-})
+
+# Note - Switched from cherrypy to just through socketio, for simplicity and so don't have to type in passphrase twice
+
+# cherrypy.tree.graft(app.wsgi_app, '/')
+# cherrypy.config.update({
+#     'server.socket_host': '127.0.0.1',
+#     'server.socket_port': 5000,
+#     'engine.autoreload.on': False,
+#     'server.ssl_module': 'builtin',
+#     'server.ssl_certificate': 'certs/info2222CA.pem',
+#     'server.ssl_private_key': 'certs/info2222CA.key',
+# })
 
 if __name__ == '__main__':
-    cherrypy.engine.start()
+    # cherrypy.engine.start()
     # socketio.run(app)
+    socketio.run(app, ssl_context=('certs/info2222CA.pem', 'certs/info2222CA.key'))
