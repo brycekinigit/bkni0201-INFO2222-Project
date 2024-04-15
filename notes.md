@@ -11,6 +11,8 @@
 [] Message history stored encrypted in database using user password to decrypt
 [] Store passwords properly with hash and salt
 [] Session Tokens
+[] Make sure that no XSS is possible (ankit on ed said it's possible in scaffold)
+[] Do report
 
 ## Misc.
 

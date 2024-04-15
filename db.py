@@ -3,8 +3,9 @@ db
 database file, containing all the logic to interface with the sql database
 '''
 
-from sqlalchemy import create_engine
+from sqlalchemy import *
 from sqlalchemy.orm import Session
+from sqlalchemy.sql import text
 from models import *
 
 from pathlib import Path
@@ -32,3 +33,9 @@ def insert_user(username: str, password: str):
 def get_user(username: str):
     with Session(engine) as session:
         return session.get(User, username)
+
+
+
+def get_friends(username):
+    with Session(engine) as session:
+        return session.execute(select(Friend).where(Friend.frienda == username or Friend.friendb == username)).all()

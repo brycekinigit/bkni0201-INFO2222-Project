@@ -29,6 +29,13 @@ class User(Base):
     # in other words we've mapped the username Python object property to an SQL column of type String 
     username: Mapped[str] = mapped_column(String, primary_key=True)
     password: Mapped[str] = mapped_column(String)
+
+class Friend(Base):
+    __tablename__ = "friend"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    frienda: Mapped[str] = mapped_column(String)
+    friendb: Mapped[str] = mapped_column(String)
+    accepted: Mapped[bool] = mapped_column()
     
 
 # stateful counter used to generate the room id
