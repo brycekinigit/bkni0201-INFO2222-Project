@@ -7,6 +7,7 @@ the socket event handlers are inside of socket_routes.py
 from flask import Flask, render_template, request, abort, url_for
 from flask_socketio import SocketIO
 import db
+from models import *
 import secrets
 
 import logging
@@ -101,7 +102,9 @@ def friends():
     user = db.get_user(request.args.get("username"))
     if user is None:
         abort(404)
-    return render_template("friends.jinja", username=user.username, friends=user.password)
+    friends = db.get_friends(user.username)
+    print(friends)
+    return render_template("friends.jinja", username=user.username, friends=friends)
 
 
 # Note - Switched from cherrypy to just through socketio, for simplicity and so don't have to type in passphrase twice

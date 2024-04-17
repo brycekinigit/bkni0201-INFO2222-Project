@@ -38,4 +38,20 @@ def get_user(username: str):
 
 def get_friends(username):
     with Session(engine) as session:
-        return session.execute(select(Friend).where(Friend.frienda == username or Friend.friendb == username)).all()
+        resulta = session.execute(select(Friend).where(Friend.frienda == username)).all()
+        resultb = session.execute(select(Friend).where(Friend.friendb == username)).all()
+        return [row[0] for row in resulta] + [row[0] for row in resultb]
+
+if __name__ == "__main__":
+    insert_user("alice", "alice123")
+    insert_user("bob", "bob123")
+    insert_user("carol", "carol123")
+    with Session(engine) as session:
+        session.add(Friend(id=1, frienda="alice", friendb="bob", accepted=True))
+        session.add(Friend(id=2, frienda="alice", friendb="anne", accepted=True))
+        session.add(Friend(id=3, frienda="bob", friendb="brian", accepted=True))
+        session.add(Friend(id=4, frienda="bob", friendb="carol", accepted=False))
+        session.add(Friend(id=5, frienda="carol", friendb="charles", accepted=True))
+        session.add(Friend(id=6, frienda="carol", friendb="alice", accepted=True))
+        
+        session.commit()

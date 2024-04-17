@@ -36,6 +36,10 @@ class Friend(Base):
     frienda: Mapped[str] = mapped_column(String)
     friendb: Mapped[str] = mapped_column(String)
     accepted: Mapped[bool] = mapped_column()
+    def __repr__(self):
+        return f"{self.frienda} <3 {self.friendb}"
+    def __str__(self):
+        return f"{self.frienda} <3 {self.friendb}"
     
 
 # stateful counter used to generate the room id
