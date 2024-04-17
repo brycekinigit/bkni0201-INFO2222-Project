@@ -3,18 +3,18 @@
 {% block content %} 
 <h2>Friends:</h2>
 {{friends}}
-    {# <table>
-        <tr>
-            <th>Name</th>
-            <th>Username</th>
-        </tr>
-        <tr>
-            <th>Alice</th>
-            <th>alice_</th>
-        </tr>
-        <tr>
-            <th>Bob</th>
-            <th>bobert</th>
-        </tr>
-    </table> #}
+<h2>Friend Requests:</h2>
+{{requests}}
+<script src="/static/js/libs/socket.io.min.js"></script>
+<script>
+let username = "{{ username }}";
+Cookies.set('username', username);
+const socket = io();
+
+function accept(id) {
+    console.log("Accepted request");
+    socket.emit("accept", id, username);
+    // location.reload();
+}
+</script>
 {% endblock %}

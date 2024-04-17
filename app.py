@@ -103,8 +103,18 @@ def friends():
     if user is None:
         abort(404)
     friends = db.get_friends(user.username)
-    print(friends)
-    return render_template("friends.jinja", username=user.username, friends=friends)
+    friends_string = "<ul>"
+    requests_string = "<ul>"
+    for i in friends:
+        if i.accepted:
+            if i.frienda != user.username:
+                friends_string += f"<li>{i.frienda}</li>"
+            else:
+                friends_string += f"<li>{i.friendb}</li>"
+        elif i.friendb == user.username:
+            requests_string += f"<li>{i.frienda} <button onclick=\"accept({i.id}, '{user.username}');\">Accept</button></li>"
+    friends_string += "</ul>"
+    return render_template("friends.jinja", username=user.username, friends=friends_string, requests=requests_string)
 
 
 # Note - Switched from cherrypy to just through socketio, for simplicity and so don't have to type in passphrase twice

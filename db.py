@@ -42,6 +42,13 @@ def get_friends(username):
         resultb = session.execute(select(Friend).where(Friend.friendb == username)).all()
         return [row[0] for row in resulta] + [row[0] for row in resultb]
 
+def accept_request(id, username):
+    with Session(engine) as session:
+        result = session.get(Friend, id)
+        result.accepted = True
+        session.commit()
+        
+
 if __name__ == "__main__":
     insert_user("alice", "alice123")
     insert_user("bob", "bob123")
