@@ -1,31 +1,24 @@
 # Notes
 
-## To Do:
+## To Do
 
 [] Login
-[] Friends list (will need a new db table for friend relations)
+[x] Friends list (will need a new db table for friend relations)
 [] Adding friends
-[] Friend request approval/denial
+[~] Friend request approval/denial
 [] Server cannot read messages (This and next *might* be covered by TLS/SSL)
 [] Server cannot modify messages (MAC)
 [] Message history stored encrypted in database using user password to decrypt
 [] Store passwords properly with hash and salt
-[] Session Tokens
+[x] Session Tokens
 [] Make sure that no XSS is possible (ankit on ed said it's possible in scaffold)
 [] Do report
 
-## Misc.
-
-We need to find out how exactly messages are sent. Peer to peer is vulnerable to impersonation, and seems to be how the template is. Server-side would only allow connection if both sides authenticate
-
-When a user logs in, the server sends a rendered version of the home page. The home page can then use some jevascript functions to send info to the server, which it passes on to the other client
+## Misc
 
 ## Current vulnerabilities
 
-- Anyone can put any username into address bar and access any other user
-- Xss
-- All users enter one big room, and cannot see who else is in.
-- Might be possible to change javascript to send whatever to whoever from whoever
+- User can be logged in on multiple devices
 
 ## Sources
 
