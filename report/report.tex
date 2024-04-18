@@ -1,0 +1,63 @@
+\documentclass[12pt]{article}
+
+\usepackage[margin=2.7cm,a4paper]{geometry} % Page formatting
+\usepackage{multicol} % For multi-column sections
+\usepackage{graphicx} % For including images
+\usepackage{amsmath,amsthm,amsfonts,amssymb,mathtools} % For math symbols
+
+% Math config
+\DeclarePairedDelimiter\ceil{\lceil}{\rceil}
+\DeclarePairedDelimiter\abs{\lvert}{\rvert}
+\DeclarePairedDelimiter\set{\{}{\}}
+
+% Header
+\usepackage{fancyhdr}
+\addtolength{\headheight}{2.5pt}
+\pagestyle{fancy}
+\fancyhead{} 
+\fancyhead[L]{\sc INFO2222} % Replace with comp2123 or comp2823
+\fancyhead[C]{\sc bkni0201, kwal3204}
+\fancyhead[R]{Project part 1: Security}
+\renewcommand{\headrulewidth}{0.75pt}
+
+\usepackage[noend]{algpseudocode} % Pseudocode
+\usepackage[tikz]{mdframed} % Outlined pseudocode
+
+\begin{document}
+%\tableofcontents
+
+\section{Logging in}
+\section{Friends}
+\section{Chatting}
+\section{Message History}
+\section{HTTPS}
+
+To make the app run over https, we generated a new key and self-signed certificate, and pointed to them as arguments when we run the main app function. This tells socketio to send it over https, with all the security that entails.
+
+\section{Session Tokens}
+
+The way we handled session tokens for this project, was using the built-in session object in flask. With this, flask generates a session token and stores it as a cookie in the user's browser. Flask can then store data associated with that session locally, and access it on a per-user basis
+
+For our approach, when a user signs in, or signs up, we set the "username" property of the session to be the currently loggen in user. We can then check this value anywhere in the code, and quickly obtain whether or not the current user is logged in, and what their username is. When we handle any user-specific request, we defer to the session\_user() function, which will return either the username of the logged in user, or a None object.
+
+\section{Work allocation}
+
+For the most part, the two of us worked on whatever we felt like, whenever we felt like it. The division of the work in the end was roughly as follows.
+\newline
+
+\noindent \textbf{BKNI0201}
+
+\begin{itemize}
+\item Friends list and database storage
+\item Session cookies
+\item Https
+\end{itemize}
+
+\noindent \textbf{KWAL3204}
+
+\begin{itemize}
+\item Password hashing and salting
+\end{itemize}
+
+\end{document}
+

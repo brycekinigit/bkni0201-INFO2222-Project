@@ -5,7 +5,7 @@ file containing all the routes related to socket.io
 
 
 from flask_socketio import join_room, emit, leave_room
-from flask import request
+from flask import request, session
 
 try:
     from __main__ import socketio
@@ -89,4 +89,4 @@ def leave(username, room_id):
 
 @socketio.on("accept")
 def accept_friend(id, username):
-    db.accept_request(id, username)
+    db.accept_request(id, session["username"])

@@ -4,7 +4,7 @@ this is where you'll find all of the get/post request handlers
 the socket event handlers are inside of socket_routes.py
 '''
 
-from flask import Flask, render_template, request, abort, url_for
+from flask import *
 from flask_socketio import SocketIO
 import db
 from models import *
@@ -15,8 +15,8 @@ import logging
 # import cherrypy
 
 # this turns off Flask Logging, uncomment this to turn off Logging
-log = logging.getLogger('werkzeug')
-log.setLevel(logging.ERROR)
+# log = logging.getLogger('werkzeug')
+# log.setLevel(logging.ERROR)
 
 app = Flask(__name__)
 
@@ -53,9 +53,8 @@ def login_user():
     if user.password != password:
         return "Error: Password does not match!"
 
-    # BKNI0201 - Changed this
-    # return url_for('home', username=request.json.get("username"))
-    return url_for('friends', username=request.json.get("username"))
+    session["username"] = username
+    return url_for('friends')
 
 # handles a get request to the signup page
 @app.route("/signup")
@@ -72,6 +71,7 @@ def signup_user():
 
     if db.get_user(username) is None:
         db.insert_user(username, password)
+        session["username"] = username
         return url_for('home', username=username)
     return "Error: User already exists!"
 
@@ -84,9 +84,10 @@ def page_not_found(_):
 # home page, where the messaging app is
 @app.route("/home")
 def home():
-    if request.args.get("username") is None:
-        abort(404)
-    return render_template("home.jinja", username=request.args.get("username"))
+    username = session_user(session)
+    if not username:
+        return redirect(url_for("signup"))
+    return render_template("home.jinja", username=username)
 
 
 
@@ -98,25 +99,31 @@ def home():
 # Template was to check if username request argument was None
 @app.route("/friends")
 def friends():
-    # Just directly accesses entry for "username" from http request
-    user = db.get_user(request.args.get("username"))
+    username = session_user(session)
+    if not username:
+        return redirect(url_for("signup"))
+    user = db.get_user(username)
     if user is None:
-        abort(404)
-    friends = db.get_friends(user.username)
+        return redirect(url_for("signup"))
+    friends = db.get_friends(username)
     friends_string = "<ul>"
     requests_string = "<ul>"
     for i in friends:
         if i.accepted:
-            if i.frienda != user.username:
+            if i.frienda != username:
                 friends_string += f"<li>{i.frienda}</li>"
             else:
                 friends_string += f"<li>{i.friendb}</li>"
-        elif i.friendb == user.username:
-            requests_string += f"<li>{i.frienda} <button onclick=\"accept({i.id}, '{user.username}');\">Accept</button></li>"
+        elif i.friendb == username:
+            requests_string += f"<li>{i.frienda} <button onclick=\"accept({i.id}, '{username}');\">Accept</button></li>"
     friends_string += "</ul>"
-    return render_template("friends.jinja", username=user.username, friends=friends_string, requests=requests_string)
+    return render_template("friends.jinja", username=username, friends=friends_string, requests=requests_string)
 
-
+def session_user(session):
+    if "username" in session.keys():
+        return session["username"]
+    else:
+        return None
 # Note - Switched from cherrypy to just through socketio, for simplicity and so don't have to type in passphrase twice
 
 # cherrypy.tree.graft(app.wsgi_app, '/')
@@ -133,3 +140,6 @@ if __name__ == '__main__':
     # cherrypy.engine.start()
     # socketio.run(app)
     socketio.run(app, ssl_context=('certs/info2222CA.pem', 'certs/info2222CA.key'))
+
+
+    
