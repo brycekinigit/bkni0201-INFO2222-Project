@@ -112,7 +112,7 @@
     function send() {
         let message = $("#message").val();
         $("#message").val("");
-        socket.emit("send", message, room_id);  
+        socket.emit("send", message);  
     } 
 
     // we emit a join room event to the server to join a room
@@ -146,7 +146,7 @@
     // emits a "leave" event, telling the server that we want to leave the room
     function leave() {
         Cookies.remove("room_id");
-        socket.emit("leave", room_id);
+        socket.emit("leave");
         $("#input_box").hide();
         $("#chat_box").show();
     }
