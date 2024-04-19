@@ -6,6 +6,7 @@ file containing all the routes related to socket.io
 
 from flask_socketio import join_room, emit, leave_room
 from flask import request, session
+from app import session_user
 
 try:
     from __main__ import socketio
@@ -22,7 +23,7 @@ room = Room()
 # this event is emitted when the io() function is called in JS
 @socketio.on('connect')
 def connect():
-    username = request.cookies.get("username")
+    username = session_user(session)
     room_id = request.cookies.get("room_id")
     if room_id is None or username is None:
         return
@@ -35,7 +36,7 @@ def connect():
 # quite unreliable use sparingly
 @socketio.on('disconnect')
 def disconnect():
-    username = request.cookies.get("username")
+    username = session_user(session)
     room_id = request.cookies.get("room_id")
     if room_id is None or username is None:
         return
@@ -43,14 +44,15 @@ def disconnect():
 
 # send message event handler
 @socketio.on("send")
-def send(username, message, room_id):
+def send(message, room_id):
+    username = session_user(session)
     emit("incoming", (f"{username}: {message}"), to=room_id)
     
 # join room event handler
 # sent when the user joins a room
 @socketio.on("join")
-def join(sender_name, receiver_name):
-    
+def join(receiver_name):
+    sender_name = session_user(session)
     receiver = db.get_user(receiver_name)
     if receiver is None:
         return "Unknown receiver!"
@@ -82,11 +84,8 @@ def join(sender_name, receiver_name):
 
 # leave room event handler
 @socketio.on("leave")
-def leave(username, room_id):
+def leave(room_id):
+    username = session_user(session)
     emit("incoming", (f"{username} has left the room.", "red"), to=room_id)
     leave_room(room_id)
     room.leave_room(username)
-
-@socketio.on("accept")
-def accept_friend(id, username):
-    db.accept_request(id, session["username"])

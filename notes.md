@@ -2,11 +2,11 @@
 
 ## To Do
 
-[] Login
+[x] Login
 [x] Friends list (will need a new db table for friend relations)
 [] Adding friends
 [~] Friend request approval/denial
-[] Server cannot read messages (This and next *might* be covered by TLS/SSL)
+[] Server cannot read messages (This and next are NOT covered by HTTPS)
 [] Server cannot modify messages (MAC)
 [] Message history stored encrypted in database using user password to decrypt
 [] Store passwords properly with hash and salt

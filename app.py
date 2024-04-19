@@ -9,10 +9,10 @@ from flask_socketio import SocketIO
 import db
 from models import *
 import secrets
-
+import bcrypt
+# don't remove this, even though not accessed!!!
+import socket_routes
 import logging
-
-# import cherrypy
 
 # this turns off Flask Logging, uncomment this to turn off Logging
 # log = logging.getLogger('werkzeug')
@@ -24,8 +24,7 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = secrets.token_hex()
 socketio = SocketIO(app)
 
-# don't remove this!!
-import socket_routes
+
 
 # index page
 @app.route("/")
@@ -49,11 +48,10 @@ def login_user():
     user =  db.get_user(username)
     if user is None:
         return "Error: User does not exist!"
-
-    if user.password != password:
-        return "Error: Password does not match!"
-
+    if not bcrypt.checkpw(password.encode(), user.password):
+        return "Error: Incorrect password!"
     session["username"] = username
+    # Do we want to redirect to friends or home?
     return url_for('friends')
 
 # handles a get request to the signup page
@@ -68,78 +66,129 @@ def signup_user():
         abort(404)
     username = request.json.get("username")
     password = request.json.get("password")
-
-    if db.get_user(username) is None:
-        db.insert_user(username, password)
-        session["username"] = username
-        return url_for('home', username=username)
-    return "Error: User already exists!"
+    
+    # Check username
+    error_message = username_error(username)
+    if error_message:
+        return error_message
+    if db.get_user(username):
+        return "Error: User already exists!"
+    
+    # check password
+    if len(password) < 6:
+        return "Error: Password too short."
+    hasspecial = False
+    hascapital = False
+    for i in password:
+        if not i.isalpha():
+            hasspecial = True
+        if i.isupper():
+            hascapital = True
+    if not hascapital:
+        return "Error: Password must contain a capital letter."
+    if not hasspecial:
+        return "Error: Password must contain a non-alphabetic character."
+    hashed_password = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
+    password = "Some string to replace the real password"
+    db.insert_user(username, hashed_password)
+    session["username"] = username
+    return url_for('home', username=username)
+        
 
 # handler when a "404" error happens
 @app.errorhandler(404)
 def page_not_found(_):
     return render_template('404.jinja'), 404
 
-# Note - Doesn't do any database access using username, efficient, but allows anyone to be anyone
 # home page, where the messaging app is
 @app.route("/home")
 def home():
     username = session_user(session)
     if not username:
-        return redirect(url_for("signup"))
+        return redirect(url_for("index"))
     return render_template("home.jinja", username=username)
 
-
-
-# OUR CODE
-
-
-
-# Here, we do db request, then check if that is None, so if a non-existent username is input, we just abort
-# Template was to check if username request argument was None
+# Friends list page, where friends are shown and managed
 @app.route("/friends")
 def friends():
     username = session_user(session)
     if not username:
-        return redirect(url_for("signup"))
+        return redirect(url_for("index"))
     user = db.get_user(username)
     if user is None:
         return redirect(url_for("signup"))
-    friends = db.get_friends(username)
-    friends_string = "<ul>"
-    requests_string = "<ul>"
-    for i in friends:
+    friends_list = db.get_friends(username)
+    friends = ""
+    incoming = ""
+    outgoing = ""
+    for i in friends_list:
         if i.accepted:
+            # put relationship the right way
             if i.frienda != username:
-                friends_string += f"<li>{i.frienda}</li>"
+                friends += f"<li>{i.frienda}</li>"
             else:
-                friends_string += f"<li>{i.friendb}</li>"
+                friends += f"<li>{i.friendb}</li>"
+        # If request is to user
         elif i.friendb == username:
-            requests_string += f"<li>{i.frienda} <button onclick=\"accept({i.id}, '{username}');\">Accept</button></li>"
-    friends_string += "</ul>"
-    return render_template("friends.jinja", username=username, friends=friends_string, requests=requests_string)
+            incoming += f"<li>{i.frienda} <button onclick=\"accept_request({i.id});\">Accept</button></li>"
+        # If request is from user
+        elif i.frienda == username:
+            outgoing += f"<li>{i.friendb} (Pending)"
+    return render_template("friends.jinja", username=username, friends=friends, incoming=incoming, outgoing=outgoing)
+
+# Handle accepting a friend request
+@app.route("/friends/accept", methods=["POST"])
+def friends_accept():
+    username = session_user(session)
+    if not username:
+        return "Error: Not logged in."
+    if not request.is_json:
+        abort(404)
+
+    friendship_id = request.json.get("friendship_id")
+    error_message = db.accept_request(friendship_id)
+    if error_message:
+        return error_message
+    return url_for("friends")
+
+@app.route("/friends/request", methods=["POST"])
+def friends_request():
+    username = session_user(session)
+    if not username:
+        return redirect(url_for("index"))
+    if not request.is_json:
+        abort(404)
+    friend = request.json.get("friend_username")
+    if username_error(friend):
+        return "Error: Invalid username"
+    if not db.get_user(friend):
+        return f"Error: No user named \"{friend}\"."
+    # TODO: Check if friend relationship exists
+    # TODO: Append new relationship to database
+    return url_for("friends")
+
 
 def session_user(session):
+    '''
+    Returns the username of the currently logged in user, or None if authentication unsuccessful
+    '''
     if "username" in session.keys():
         return session["username"]
     else:
         return None
-# Note - Switched from cherrypy to just through socketio, for simplicity and so don't have to type in passphrase twice
 
-# cherrypy.tree.graft(app.wsgi_app, '/')
-# cherrypy.config.update({
-#     'server.socket_host': '127.0.0.1',
-#     'server.socket_port': 5000,
-#     'engine.autoreload.on': False,
-#     'server.ssl_module': 'builtin',
-#     'server.ssl_certificate': 'certs/info2222CA.pem',
-#     'server.ssl_private_key': 'certs/info2222CA.key',
-# })
+def username_error(username):
+    '''
+    Returns an empty string if the username is valid, or an appropriate error message if not
+    '''
+    if len(username) < 3:
+        return "Error: Username too short."
+    valid_characters = "?!@#$%^&*()-_+"
+    for i in username:
+        if not (i.isalpha() or i.isnumeric or i in valid_characters):
+            return "Error: Username contains invalid characters"
+    return ""
 
 if __name__ == '__main__':
-    # cherrypy.engine.start()
     # socketio.run(app)
     socketio.run(app, ssl_context=('certs/info2222CA.pem', 'certs/info2222CA.key'))
-
-
-    

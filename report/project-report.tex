@@ -26,6 +26,20 @@
 \begin{document}
 %\tableofcontents
 
+\section{Signing up}
+
+The only time the server has the raw password for a user is in the moment when they sign up, and when they sign in. To minimise the risk of any leaks, we deal with the password as quickly as possible. For signing up, this means we check the password meets some conditions, then hash it and store it in the database, and actually deleting the password variable just in case.
+
+We decided that some reasonable password requirements were:
+
+\begin{itemize}
+    \item Must be at least 6 characters long
+    \item Must contain at least 1 capital letter
+    \item Must contain at least 1 non-alphabetic character (number or special character)
+\end{itemize}
+
+(Why did we use bcrypto?)
+
 \section{Logging in}
 \section{Friends}
 \section{Chatting}

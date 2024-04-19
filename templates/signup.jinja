@@ -10,7 +10,8 @@ Sign up page, pretty much the same as login.
     <input id="username"/>
     <p>Password</p>
     <input id="password" type="password"/>
-    <button onclick="signup()">Sign up</button>
+    <button onclick="signup()">Sign Up</button>
+    <p><a href={{ url_for('login') }}>Log In</a></p>
 
     <script>
          function isValidURL(string) {

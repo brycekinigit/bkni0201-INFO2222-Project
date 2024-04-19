@@ -1,20 +1,56 @@
 <!-- Error page when you visited the wrong URL or did something very very wrong :O-->
 {% extends 'base.jinja' %}
-{% block content %} 
+{% block content %}
 <h2>Friends:</h2>
-{{friends}}
+<ul>
+    {{ friends }}
+</ul>
 <h2>Friend Requests:</h2>
-{{requests}}
+<h3>Incoming</h3>
+<ul>
+    {{ incoming }}
+</ul>
+<h3>Outgoing</h3>
+<p>
+<input id="friend-input" /><button onclick="send_request()">Send Request</button>
+</p>
+<ul>
+    {{ outgoing }}
+</ul>
 <script src="/static/js/libs/socket.io.min.js"></script>
 <script>
-let username = "{{ username }}";
-Cookies.set('username', username);
-const socket = io();
+    // All of this is adapted from login function on login page, see that for explanation
+    function isValidURL(string) {
+        if (string.length == 0) {
+            return false;
+        }
+        if (string[0] == "/") {
+            return true;
+        }
+        return false;
+    }
+    let acceptURL = "{{ url_for('friends_accept') }}";
+    let requestURL = "{{ url_for('friends_request') }}";
+    async function accept_request(id) {
+        let res = await axios.post(acceptURL, {
+            friendship_id: id
+        });
+        if (!isValidURL(res.data)) {
+            alert(res.data);
+            return;
+        }
+        window.open(res.data, "_self")
+    }
 
-function accept(id) {
-    console.log("Accepted request");
-    socket.emit("accept", id, username);
-    // location.reload();
-}
+    async function send_request() {
+        let res = await axios.post(requestURL, {
+            friend_username: $("#friend-input").val()
+        });
+        if (!isValidURL(res.data)) {
+            alert(res.data);
+            return;
+        }
+        window.open(res.data, "_self")
+    }
 </script>
 {% endblock %}

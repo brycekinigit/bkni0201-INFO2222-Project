@@ -42,23 +42,23 @@ def get_friends(username):
         resultb = session.execute(select(Friend).where(Friend.friendb == username)).all()
         return [row[0] for row in resulta] + [row[0] for row in resultb]
 
-def accept_request(id, username):
+def accept_request(id):
     with Session(engine) as session:
         result = session.get(Friend, id)
-        result.accepted = True
-        session.commit()
+        if result:
+            result.accepted = True
+            session.commit()
+            return
+        return f"Error: Couldn't find request {id}"
         
 
 if __name__ == "__main__":
-    insert_user("alice", "alice123")
-    insert_user("bob", "bob123")
-    insert_user("carol", "carol123")
     with Session(engine) as session:
-        session.add(Friend(id=1, frienda="alice", friendb="bob", accepted=True))
-        session.add(Friend(id=2, frienda="alice", friendb="anne", accepted=True))
-        session.add(Friend(id=3, frienda="bob", friendb="brian", accepted=True))
-        session.add(Friend(id=4, frienda="bob", friendb="carol", accepted=False))
-        session.add(Friend(id=5, frienda="carol", friendb="charles", accepted=True))
-        session.add(Friend(id=6, frienda="carol", friendb="alice", accepted=True))
-        
+        session.add(Friend(id=1, frienda="alice", friendb="anne", accepted=True))
+        session.add(Friend(id=2, frienda="alice", friendb="abby", accepted=True))
+        session.add(Friend(id=3, frienda="alice", friendb="anya", accepted=True))
+        session.add(Friend(id=4, frienda="bob", friendb="alice", accepted=False))
+        session.add(Friend(id=5, frienda="brian", friendb="alice", accepted=False))
+        session.add(Friend(id=6, frienda="alice", friendb="carol", accepted=False))
+        session.add(Friend(id=7, frienda="alice", friendb="charles", accepted=False))
         session.commit()
