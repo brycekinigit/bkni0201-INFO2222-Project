@@ -6,7 +6,6 @@ file containing all the routes related to socket.io
 
 from flask_socketio import join_room, emit, leave_room
 from flask import request, session
-from app import session_user
 
 try:
     from __main__ import socketio
@@ -16,21 +15,13 @@ except ImportError:
 from models import Room
 
 import db
+from utils import *
 
 room = Room()
 
 # when the client connects to a socket
 # this event is emitted when the io() function is called in JS
-@socketio.on('connect')
-def connect():
-    username = session_user(session)
-    room_id = request.cookies.get("room_id")
-    if room_id is None or username is None:
-        return
-    # socket automatically leaves a room on client disconnect
-    # so on client connect, the room needs to be rejoined
-    join_room(int(room_id))
-    emit("incoming", (f"{username} has connected", "green"), to=int(room_id))
+
 
 # event when client disconnects
 # quite unreliable use sparingly
@@ -52,8 +43,8 @@ def send(message):
 # join room event handler
 # sent when the user joins a room
 @socketio.on("join")
-def join(receiver_name):
-    sender_name = session_user(session)
+def join(sender_name, receiver_name):
+    # sender_name = session_user(session)
     receiver = db.get_user(receiver_name)
     if receiver is None:
         return "Unknown receiver!"
