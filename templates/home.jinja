@@ -4,32 +4,35 @@
 {% extends 'base.jinja' %}
 
 
-{% block content %} 
-   <style>
+{% block content %}
+<style>
     nav {
         border-bottom: 1px solid black;
         overflow: auto
     }
 
     #message_box {
-        border: 1px solid black; 
-        height: 400px; 
-        width: 800px; 
+        border: 1px solid black;
+        height: 400px;
+        width: 800px;
         overflow: auto;
         padding: 2px;
     }
 
-    .text  {
+    .text {
         margin-top: 2px;
         margin-bottom: 2px;
     }
-
 </style>
 
 <!--Navbar, you'll see the username here-->
 <nav style="border-bottom: 1px solid black;">
+    <ol style="float: left">
+        <li style="display:inline-block"><a href="{{ url_for('home') }}">Home</a></li>
+        <li style="display:inline-block"><a href="{{ url_for('friends') }}">Friends</a></li>
+    </ol>
     <ol style="float: right">
-        <li style="display:inline-block">Username:  {{ username }} </li>
+        <li style="display:inline-block">Username: {{ username }} </li>
     </ol>
 </nav>
 
@@ -51,7 +54,7 @@
 
     <!-- The (message) input box is set to display: none initially, 
     this means the input box is "invisible" initially-->
-    <section id="input_box" style="display: none" >
+    <section id="input_box" style="display: none">
         <p class="text">Message: </p>
         <input id="message" placeholder="message">
         <button onclick="send()">Send</button>
@@ -73,7 +76,7 @@
 
     // when the user presses the enter key inside of the "receiver box"
     // the user joins a (socket) room
-     $("#receiver").on("keyup", (e) => {
+    $("#receiver").on("keyup", (e) => {
         if (e.key == "Enter") {
             join_room();
         }
@@ -93,7 +96,7 @@
         $("#input_box").show();
         room_id = parseInt(Cookies.get("room_id"));
     })
-    
+
     // Here's the Socket IO part of the code
     // things get a bit complicated here so brace yourselves :P
     let username = "{{ username }}";
@@ -104,25 +107,25 @@
     const socket = io();
 
     // an incoming message arrives, we'll add the message to the message box
-    socket.on("incoming", (msg, color="black") => {
+    socket.on("incoming", (msg, color = "black") => {
         add_message(msg, color);
     })
-    
+
     // we'll send the message to the server by emitting a "send" event
     function send() {
         let message = $("#message").val();
         $("#message").val("");
-        socket.emit("send", message);  
-    } 
+        socket.emit("send", message);
+    }
 
     // we emit a join room event to the server to join a room
     function join_room() {
-       
+
         let receiver = $("#receiver").val();
 
         // pass in the receiver of our message to the server
         // as well as the current user's username
-        socket.emit("join", username, receiver, (res) => {
+        socket.emit("join", receiver, (res) => {
             // res is a string with the error message if the error occurs
             // this is a pretty bad way of doing error handling, but watevs
             if (typeof res != "number") {
@@ -139,7 +142,7 @@
             $("#chat_box").hide();
             $("#input_box").show();
         });
-     
+
     }
 
     // function when the user clicks on "Leave Room"
@@ -158,6 +161,6 @@
         let child = $(`<p style="color:${color}; margin: 0px;"></p>`).text(message);
         box.append(child);
     }
-    
+
 </script>
 {% endblock %}

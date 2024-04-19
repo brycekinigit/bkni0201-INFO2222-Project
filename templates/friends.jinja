@@ -1,6 +1,25 @@
 <!-- Error page when you visited the wrong URL or did something very very wrong :O-->
 {% extends 'base.jinja' %}
 {% block content %}
+<style>
+    nav {
+        border-bottom: 1px solid black;
+        overflow: auto
+    }
+    .text {
+        margin-top: 2px;
+        margin-bottom: 2px;
+    }
+</style>
+<nav style="border-bottom: 1px solid black;">
+    <ol style="float: left">
+        <li style="display:inline-block"><a href="{{ url_for('home') }}">Home</a></li>
+        <li style="display:inline-block"><a href="{{ url_for('friends') }}">Friends</a></li>
+    </ol>
+    <ol style="float: right">
+        <li style="display:inline-block">Username: {{ username }} </li>
+    </ol>
+</nav>
 <h2>Friends:</h2>
 <ul>
     {{ friends }}
@@ -12,7 +31,7 @@
 </ul>
 <h3>Outgoing</h3>
 <p>
-<input id="friend-input" /><button onclick="send_request()">Send Request</button>
+    <input id="friend-input" /><button onclick="send_request()">Send Request</button>
 </p>
 <ul>
     {{ outgoing }}
