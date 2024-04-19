@@ -44,8 +44,9 @@ def disconnect():
 
 # send message event handler
 @socketio.on("send")
-def send(message, room_id):
+def send(message):
     username = session_user(session)
+    room_id = room.get_room_id(username)
     emit("incoming", (f"{username}: {message}"), to=room_id)
     
 # join room event handler
