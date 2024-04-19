@@ -122,7 +122,7 @@
 
         // pass in the receiver of our message to the server
         // as well as the current user's username
-        socket.emit("join", receiver, (res) => {
+        socket.emit("join", username, receiver, (res) => {
             // res is a string with the error message if the error occurs
             // this is a pretty bad way of doing error handling, but watevs
             if (typeof res != "number") {

@@ -10,6 +10,12 @@ import db
 from models import *
 import secrets
 import bcrypt
+<<<<<<< HEAD
+=======
+# don't remove this, even though not accessed!!!
+import socket_routes
+from utils import *
+>>>>>>> ec1da9b7081b734fc615bdc1f41948729f71ba10
 import logging
 
 room = Room()
@@ -202,11 +208,20 @@ def send(message):
 # join room event handler
 # sent when the user joins a room
 @socketio.on("join")
+<<<<<<< HEAD
 def join(receiver_name):
     sender_name = session_user(session)
     receiver = db.get_user(receiver_name)
     if receiver is None:
         return "Unknown receiver!"
+=======
+def join(sender_name, receiver_name):
+    # sender_name = session_user(session)
+    receiver = db.get_user(receiver_name)
+    if receiver is None:
+        return "Unknown receiver!"
+    
+>>>>>>> ec1da9b7081b734fc615bdc1f41948729f71ba10
     sender = db.get_user(sender_name)
     if sender is None:
         return "Unknown sender!"
@@ -234,8 +249,12 @@ def join(receiver_name):
 
 # leave room event handler
 @socketio.on("leave")
+<<<<<<< HEAD
 def leave():
     room_id = room.get_room_id(username)
+=======
+def leave(room_id):
+>>>>>>> ec1da9b7081b734fc615bdc1f41948729f71ba10
     username = session_user(session)
     emit("incoming", (f"{username} has left the room.", "red"), to=room_id)
     leave_room(room_id)
