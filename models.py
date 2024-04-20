@@ -10,7 +10,7 @@ Prisma docs also looks so much better in comparison
 or use SQLite, if you're not into fancy ORMs (but be mindful of Injection attacks :) )
 '''
 
-from sqlalchemy import String, BINARY
+from sqlalchemy import String, BINARY, JSON
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from typing import Dict
 
@@ -22,7 +22,9 @@ class Base(DeclarativeBase):
 class User(Base):
     __tablename__ = "user"
     username: Mapped[str] = mapped_column(String, primary_key=True)
-    password = mapped_column(BINARY)
+    password_hash = mapped_column(BINARY)
+    password_client_salt: Mapped[str] = mapped_column(String)
+    room_keys = mapped_column(JSON)
     
     # looks complicated but basically means
     # I want a username column of type string,
@@ -36,10 +38,6 @@ class Friend(Base):
     frienda: Mapped[str] = mapped_column(String)
     friendb: Mapped[str] = mapped_column(String)
     accepted: Mapped[bool] = mapped_column()
-    def __repr__(self):
-        return f"{self.frienda} <3 {self.friendb}"
-    def __str__(self):
-        return f"{self.frienda} <3 {self.friendb}"
     
 
 # stateful counter used to generate the room id

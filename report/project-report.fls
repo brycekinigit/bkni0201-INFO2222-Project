@@ -748,11 +748,13 @@ INPUT C:\Users\brcknt\AppData\Local\Programs\MiKTeX\tex\latex\00miktex\epstopdf-
 INPUT C:\Users\brcknt\AppData\Local\Programs\MiKTeX\tex\latex\graphics\graphicx.sty
 INPUT C:\Users\brcknt\AppData\Local\Programs\MiKTeX\fonts\tfm\public\cm\cmr17.tfm
 INPUT C:\Users\brcknt\AppData\Local\Programs\MiKTeX\fonts\tfm\public\cm\cmbx12.tfm
+INPUT C:\Users\brcknt\AppData\Local\Programs\MiKTeX\fonts\tfm\public\cm\cmr12.tfm
+INPUT C:\Users\brcknt\AppData\Local\Programs\MiKTeX\fonts\tfm\public\cm\cmbx12.tfm
+INPUT C:\Users\brcknt\AppData\Local\Programs\MiKTeX\fonts\tfm\public\cm\cmbx12.tfm
 INPUT C:\Users\brcknt\AppData\Local\Programs\MiKTeX\fonts\tfm\jknappen\ec\tcrm1200.tfm
 INPUT C:\Users\brcknt\AppData\Local\Programs\MiKTeX\fonts\tfm\public\cm\cmcsc10.tfm
 OUTPUT project-report.pdf
 INPUT C:\Users\brcknt\AppData\Local\MiKTeX\fonts\map\pdftex\pdftex.map
-INPUT C:\Users\brcknt\AppData\Local\Programs\MiKTeX\fonts\tfm\public\cm\cmbx12.tfm
 INPUT project-report.aux
 INPUT C:\Users\brcknt\AppData\Local\MiKTeX\fonts\pk\ljfour\jknappen\ec\dpi600\tcrm1200.pk
 INPUT C:\Users\brcknt\AppData\Local\MiKTeX\fonts\pk\ljfour\jknappen\ec\dpi600\tcrm1200.pk

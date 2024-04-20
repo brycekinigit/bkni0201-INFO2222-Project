@@ -63,6 +63,8 @@
 </main>
 
 <script src="/static/js/libs/socket.io.min.js"></script>
+<script src="/static/js/libs/bcrypt.min.js"></script>
+<script src="/static/js/message-encryption.js"></script>
 <script>
     let room_id = 0;
 
@@ -123,8 +125,12 @@
 
         let receiver = $("#receiver").val();
 
+
         // pass in the receiver of our message to the server
         // as well as the current user's username
+        // Find shared secret with partner
+        // Check if shared secret is the same
+        // Encrypt it and send it to server
         socket.emit("join", receiver, (res) => {
             // res is a string with the error message if the error occurs
             // this is a pretty bad way of doing error handling, but watevs
@@ -136,7 +142,17 @@
             // set the room id variable to the room id returned by the server
             room_id = res;
             Cookies.set("room_id", room_id);
-            // TODO: create a database entry for the room
+
+            var iv = crypto.getRandomValues(new Uint8Array(12));
+            keyFromJSON(JSON.parse(sessionStorage.getItem("messageKey")))
+                .then(key => {
+                    // TODO: Perform key exchange, agree on key, encrypt and send to server
+                    // or get key from server and decrypt it
+                }).catch(error => {
+                    console.error("Error:", error);
+                    alert("Error: Couldn't parse key from sessionStorage");
+                    return;
+                });
 
             // now we'll show the input box, so the user can input their message
             $("#chat_box").hide();

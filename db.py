@@ -23,9 +23,13 @@ engine = create_engine("sqlite:///database/main.db", echo=True)
 Base.metadata.create_all(engine)
 
 # inserts a user to the database
-def insert_user(username: str, password: str):
+def insert_user(username: str, password_hash: bytes, password_client_salt: str):
     with Session(engine) as session:
-        user = User(username=username, password=password)
+        user = User(
+            username=username,
+            password_hash=password_hash,
+            password_client_salt = password_client_salt,
+        )
         session.add(user)
         session.commit()
 
@@ -50,6 +54,21 @@ def accept_request(id):
             session.commit()
             return
         return f"Error: Couldn't find request {id}"
+
+def reject_friend(id):
+    with Session(engine) as session:
+        result = session.get(Friend, id)
+        if result:
+            session.delete(result)
+            session.commit()
+            return
+        return f"Error: Couldn't find request {id}"
+
+def insert_friend(frienda, friendb):
+    with Session(engine) as session:
+        friendship = Friend(frienda=frienda, friendb=friendb, accepted=False)
+        session.add(friendship)
+        session.commit()
         
 
 if __name__ == "__main__":

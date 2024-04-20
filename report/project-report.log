@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.24 (MiKTeX 23.1) (preloaded format=pdflatex 2023.3.31)  19 APR 2024 12:59
+This is pdfTeX, Version 3.141592653-2.6-1.40.24 (MiKTeX 23.1) (preloaded format=pdflatex 2023.3.31)  21 APR 2024 00:25
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -674,25 +674,55 @@ Package epstopdf-base Info: Redefining graphics rule for `.eps' on input line 48
  (C:\Users\brcknt\AppData\Local\Programs\MiKTeX\tex/latex/00miktex\epstopdf-sys.cfg
 File: epstopdf-sys.cfg 2021/03/18 v2.0 Configuration of epstopdf for MiKTeX
 ))
+Underfull \hbox (badness 10000) in paragraph at lines 53--55
+
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 56--58
+
+ []
+
+
 Underfull \hbox (badness 10000) in paragraph at lines 59--61
+
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 62--64
+
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 65--67
+
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 68--70
 
  []
 
 [1{C:/Users/brcknt/AppData/Local/MiKTeX/fonts/map/pdftex/pdftex.map}
 
-] [2] (project-report.aux) ) 
+] [2]
+Underfull \hbox (badness 10000) in paragraph at lines 108--110
+
+ []
+
+[3] (project-report.aux) ) 
 Here is how much of TeX's memory you used:
- 16963 strings out of 476339
- 338779 string characters out of 5787647
- 1857340 words of memory out of 5000000
- 37080 multiletter control sequences out of 15000+600000
- 514136 words of font info for 38 fonts, out of 8000000 for 9000
+ 16965 strings out of 476339
+ 338812 string characters out of 5787647
+ 1859340 words of memory out of 5000000
+ 37082 multiletter control sequences out of 15000+600000
+ 514741 words of font info for 40 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
- 108i,11n,117p,529b,252s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 108i,11n,117p,678b,252s stack positions out of 10000i,1000n,20000p,200000b,200000s
  <C:\Users\brcknt\AppData\Local\MiKTeX\fonts/pk/ljfour/jknappen/ec/dpi600\tcrm1200.pk><C:/Users/brcknt/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmbx12.pfb><C:/Users/brcknt/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmcsc10.pfb><C:/Users/brcknt/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmr12.pfb>
-Output written on project-report.pdf (2 pages, 50322 bytes).
+Output written on project-report.pdf (3 pages, 59960 bytes).
 PDF statistics:
- 32 PDF objects out of 1000 (max. 8388607)
+ 35 PDF objects out of 1000 (max. 8388607)
  0 named destinations out of 1000 (max. 500000)
  13 words of extra memory for PDF output out of 10000 (max. 10000000)
 

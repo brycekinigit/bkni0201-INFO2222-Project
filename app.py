@@ -48,10 +48,9 @@ def login_user():
     user =  db.get_user(username)
     if user is None:
         return "Error: User does not exist!"
-    if not bcrypt.checkpw(password.encode(), user.password):
+    if not bcrypt.checkpw(password.encode(), user.password_hash):
         return "Error: Incorrect password!"
     session["username"] = username
-    # Do we want to redirect to friends or home?
     return url_for('friends', username=username)
 
 # handles a get request to the signup page
@@ -66,6 +65,7 @@ def signup_user():
         abort(404)
     username = request.json.get("username")
     password = request.json.get("password")
+    password_client_salt = request.json.get("passwordSalt")
     
     # Check username
     error_message = username_error(username)
@@ -75,7 +75,7 @@ def signup_user():
         return "Error: User already exists!"
     
     # check password
-    if len(password) < 6:
+    if (not password) or len(password) < 6:
         return "Error: Password too short."
     hasspecial = False
     hascapital = False
@@ -90,9 +90,9 @@ def signup_user():
         return "Error: Password must contain a non-alphabetic character."
     hashed_password = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
     password = "Some string to replace the real password"
-    db.insert_user(username, hashed_password)
+    db.insert_user(username, hashed_password, password_client_salt)
     session["username"] = username
-    return url_for('home', username=username)
+    return url_for('friends', username=username)
         
 
 # handler when a "404" error happens
@@ -130,7 +130,7 @@ def friends():
                 friends += f"<li>{i.friendb}</li>"
         # If request is to user
         elif i.friendb == username:
-            incoming += f"<li>{i.frienda} <button onclick=\"accept_request({i.id});\">Accept</button></li>"
+            incoming += f"<li>{i.frienda} <button onclick=\"accept_request({i.id});\">Accept</button> <button onclick=\"reject_request({i.id});\">Reject</button></li>"
         # If request is from user
         elif i.frienda == username:
             outgoing += f"<li>{i.friendb} (Pending)"
@@ -151,6 +151,21 @@ def friends_accept():
         return error_message
     return url_for("friends")
 
+# Handle accepting a friend request
+@app.route("/friends/reject", methods=["POST"])
+def friends_reject():
+    username = session_user(session)
+    if not username:
+        return "Error: Not logged in."
+    if not request.is_json:
+        abort(404)
+
+    friendship_id = request.json.get("friendship_id")
+    error_message = db.reject_friend(friendship_id)
+    if error_message:
+        return error_message
+    return url_for("friends")
+
 @app.route("/friends/request", methods=["POST"])
 def friends_request():
     username = session_user(session)
@@ -163,9 +178,28 @@ def friends_request():
         return "Error: Invalid username"
     if not db.get_user(friend):
         return f"Error: No user named \"{friend}\"."
-    # TODO: Check if friend relationship exists
-    # TODO: Append new relationship to database
+    if friend == username:
+        return "Error: You cannot befriend yourself"
+    # Get all relationships referencing user
+    friends = db.get_friends(username)
+    for i in friends:
+        if i.frienda == friend or i.friendb == friend:
+            return "Error: Relationship already exists"
+    db.insert_friend(username, friend)
     return url_for("friends")
+
+
+
+@app.route("/user/password-message-salt/<username>")
+def get_password_client_salt(username):
+    # if not request.is_json:
+    #     abort(404)
+    # if username_error(username):
+    #     return "Error: Invalid username"
+    user = db.get_user(username)
+    if not user:
+        return f"Error: No user named \"{username}\"."
+    return user.password_client_salt
 
 
 

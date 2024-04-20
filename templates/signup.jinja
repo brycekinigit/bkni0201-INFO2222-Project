@@ -4,38 +4,53 @@ Sign up page, pretty much the same as login.
 {% extends 'base.jinja' %}
 
 
-{% block content %} 
-    <h1>Sign Up</h1>
-    <p>Username</p>
-    <input id="username"/>
-    <p>Password</p>
-    <input id="password" type="password"/>
-    <button onclick="signup()">Sign Up</button>
-    <p><a href={{ url_for('login') }}>Log In</a></p>
+{% block content %}
+<h1>Sign Up</h1>
+<p>Username</p>
+<input id="username" />
+<p>Password</p>
+<input id="password" type="password" />
+<button onclick="signup()">Sign Up</button>
+<p><a href={{ url_for('login') }}>Log In</a></p>
 
-    <script>
-         function isValidURL(string) {
-            if (string.length == 0) {
-                return false;
-            }
-            if (string[0] == "/") {
-                return true;
-            }
+<script src="/static/js/libs/bcrypt.min.js"></script>
+<script src="/static/js/message-encryption.js"></script>
+<script>
+    var bcrypt = dcodeIO.bcrypt;
+    function isValidURL(string) {
+        if (string.length == 0) {
             return false;
         }
-
-        // this function is identical to login(), see login.jinja
-        async function signup() {
-            let loginURL = "{{ url_for('signup_user') }}";
-            let res = await axios.post(loginURL, {
-                username: $("#username").val(),
-                password: $("#password").val()
-            });
-            if (!isValidURL(res.data)) {
-                alert(res.data);
-                return;
-            }
-            window.open(res.data, "_self")
+        if (string[0] == "/") {
+            return true;
         }
-    </script>
+        return false;
+    }
+
+    // this function is identical to login(), see login.jinja
+    async function signup() {
+        let loginURL = "{{ url_for('signup_user') }}";
+        const passwordSalt = bcrypt.genSaltSync();
+        const passwordHash = bcrypt.hashSync($("#password").val(), passwordSalt)
+        
+        // Generate public and private key from password
+        
+        const messageKey = await aesKeyFromPassword(password, passwordSalt);
+        const keyJSON = await keyToJSON(messageKey);
+        sessionStorage.setItem("messageKey", JSON.stringify(keyJSON));
+
+
+        let res = await axios.post(loginURL, {
+            username: $("#username").val(),
+            password: passwordHash,
+            passwordSalt: passwordSalt
+        });
+        if (!isValidURL(res.data)) {
+            alert(res.data);
+            return;
+        }
+        console.log("Computed hash: " + passwordHash);
+        window.open(res.data, "_self")
+    }
+</script>
 {% endblock %}

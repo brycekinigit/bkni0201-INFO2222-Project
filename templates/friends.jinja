@@ -48,9 +48,8 @@
         }
         return false;
     }
-    let acceptURL = "{{ url_for('friends_accept') }}";
-    let requestURL = "{{ url_for('friends_request') }}";
     async function accept_request(id) {
+        let acceptURL = "{{ url_for('friends_accept') }}";
         let res = await axios.post(acceptURL, {
             friendship_id: id
         });
@@ -61,7 +60,21 @@
         window.open(res.data, "_self")
     }
 
+    async function reject_request(id) {
+        console.log("REJECTED REQUEST");
+        let rejectURL = "{{ url_for('friends_reject') }}";
+        let res = await axios.post(rejectURL, {
+            friendship_id: id
+        });
+        if (!isValidURL(res.data)) {
+            alert(res.data);
+            return;
+        }
+        window.open(res.data, "_self")
+    }
+
     async function send_request() {
+        let requestURL = "{{ url_for('friends_request') }}";
         let res = await axios.post(requestURL, {
             friend_username: $("#friend-input").val()
         });

@@ -28,6 +28,12 @@
 
 \section{Signing up}
 
+\subsection{Client}
+
+On the client side, we take a hash of the password, and use that as the password to authenticate logging in. This means the true password is still secure, even if the server is malicious and logs all passwords. The reason for this is made clear later, when we need a new key to be kept secret from the server, with only the user's password. When we hash the password, the salt is sent separately to the server so that it can be accessed later when logging in again. Reasoning is given in the \textbf{Malicious Server} section for why we can allow this salt to be accessed publicly.
+
+\subsection{Server}
+
 The only time the server has the raw password for a user is in the moment when they sign up, and when they sign in. To minimise the risk of any leaks, we deal with the password as quickly as possible. For signing up, this means we check the password meets some conditions, then hash it and store it in the database, and actually deleting the password variable just in case.
 
 We decided that some reasonable password requirements were:
@@ -38,15 +44,58 @@ We decided that some reasonable password requirements were:
     \item Must contain at least 1 non-alphabetic character (number or special character)
 \end{itemize}
 
-(Why did we use bcrypto?)
-
 \section{Logging in}
+
+
+
 \section{Friends}
+
+Friend requests and relationships are stored in the database as Friend objects, with an integer primary key, frienda, representing the sender, friendb, representing the receiver, and accepted, a boolean value representing whether or not a friend request has been accepted. With this, incoming, outgoing, and existing friends can simply be kept track of in a single database, with each action being a simple change.
+\newline
+
+\noindent \textbf{Friends:} All Friends where (frienda or friendb = username) and accepted = True
+\newline
+
+\noindent \textbf{Incoming:} All Friends where friendb = username and accepted = False
+\newline
+
+\noindent \textbf{Outgoing:} All Friends where frienda = username and accepted = False
+\newline
+
+\noindent \textbf{Request:} friends.add(Friend(username, recipient, False))
+\newline
+
+\noindent \textbf{Accept:} friends.get(id).accepted = True
+\newline
+
+\noindent \textbf{Reject:} friends.delete(id)
+
 \section{Chatting}
-\section{Message History}
+\section{Message Encryption \& History}
+
+\section{Malicious Server}
+
+For the purposes of this section, we'll assume that the server is entirely malicious, and cannot be trusted. We'll also assume that two given users are able to verify each others identity, and that the server isn't directly pretending to be the other user.
+
+\subsection{Password}
+
+This means that the server can retain the raw login credentials sent to it. The server must not be allowed to read user's messages, requiring that they be a step more secure than the login credentials.
+
+To accomplish this, on the client side, we hash the password, and use that hash as the login password for the server. The salt here is also sent to the server, which the server makes available publicly through GET requests, so that the user can access it while (before) logging in. This salt does not need to be kept secret, and only exists for the purposes of preventing rainbow table attacks. This same salt is also used when generating the secret \textbf{user message key} upon each login, so that stays the same across logins.
+
+\subsection{User message key}
+
+When the user logs in, the browser generates a key from the password, whose only use is to encrypt shared secrets agreed upon when messaging another users, so that message history can be accessed across subsequent sessions.
+
+We cannot necessarily store any permanent data on the user's machine, but the server cannot be allowed to know the means to decrypt user's messages. The solution to this problem is to, on each login, generate a key that will be used to encrypt the room master decryption keys before they are stored in the server's database.
+
+This is done using PBKDF2, introducing more entropy and taking more computation, making it difficult to decrypt. the PBKDF2 key material is then used to generate an AES-GCM key. This key is the same for each login, and is kept secret the server.
+
+To allow the key to be used across pages during a session, it is stored locally in sessionStorage immediately upon logging in. This key is useless to anyone but the server, as communications are encrypted and verified first by HTTPS, so does not need to be kept from outside attackers, just the server. The only circumstances under which the server can even see the key is if page sends it back to the server, which a user can see and potentially stop.
+
 \section{HTTPS}
 
-To make the app run over https, we generated a new key and self-signed certificate, and pointed to them as arguments when we run the main app function. This tells socketio to send it over https, with all the security that entails.
+To make the app run over https, we generated a new key and self-signed certificate, and pointed to them as arguments when we run the main app function. This tells socketio to send it over https, with all the security that entails. This can be verified in the browser, which shows information about the encryption and certificate. The only warning the browser gives, is initially, that the certificate is self-signed, which is unavoidable in the context of this assignment. Once an exception is added for that, it will only show the warning in a submenu.
 
 \section{Session Tokens}
 
@@ -62,15 +111,18 @@ For the most part, the two of us worked on whatever we felt like, whenever we fe
 \noindent \textbf{BKNI0201}
 
 \begin{itemize}
-\item Friends list and database storage
-\item Session cookies
+\item Friend request, accept, reject, database storage
+\item Session token and token verification
 \item Https
+\item Password pre-hashing and key generation
+\item Message encryption
 \end{itemize}
 
 \noindent \textbf{KWAL3204}
 
 \begin{itemize}
-\item Password hashing and salting
+\item Password hashing and salting (initial implementation)
+\item Message history database storage
 \end{itemize}
 
 \end{document}
