@@ -11,6 +11,8 @@ Sign up page, pretty much the same as login.
 <p>Password</p>
 <input id="password" type="password" />
 <button onclick="signup()">Sign Up</button>
+<p style="visibility: hidden;" id="capitalError"> Error: Password must contain a capital letter.</p>
+<p style="visibility: hidden;" id="specialError"> Error: Password must contain a non-alphabetic character.</p>
 <p><a href={{ url_for('login') }}>Log In</a></p>
 
 <script src="/static/js/libs/bcrypt.min.js"></script>
@@ -29,7 +31,48 @@ Sign up page, pretty much the same as login.
 
     // this function is identical to login(), see login.jinja
     async function signup() {
-        let loginURL = "{{ url_for('signup_user') }}";
+        let loginURL = "{{ url_for('signup_user') }}"
+
+        // resets elements after for next password check warnings
+        document.getElementById("capitalError").style.visibility="hidden";
+        document.getElementById("specialError").style.visibility="hidden";
+
+        let password = $("#password").val()
+        let hasspecial = false;
+        let hascapital = false;
+
+        for (let i = 0; i < password.length; i++)
+        {
+            // https://stackoverflow.com/a/9862788 (regex check if string is in alphabet)
+            if (!password[i].match(/[a-z]/i))
+            {
+                hasspecial = true;
+            }
+            
+            if (password[i].match(/[a-z]/i))
+            {
+                if (password[i] == password[i].toUpperCase())
+                {
+                    hascapital = true;
+                }
+            }
+        }
+
+        if (!hascapital)
+        {
+            // or load whatever error (maybe some txt in html)
+            document.getElementById("capitalError").style.visibility="visible";
+            console.log("Error: Password must contain a capital letter.");
+            return;
+        }
+
+        if (!hasspecial)
+        {
+            // or load whatever error (maybe some txt in html)
+            document.getElementById("specialError").style.visibility="visible";
+            console.log("Error: Password must contain a non-alphabetic character.");
+            return;
+        }
         const passwordSalt = bcrypt.genSaltSync();
         const passwordHash = bcrypt.hashSync($("#password").val(), passwordSalt)
         

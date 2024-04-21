@@ -44,6 +44,24 @@
         let res = await axios.get("/user/password-message-salt/" + username, {
             username: username,
         });
+
+        /*
+    hasspecial = False
+    hascapital = False
+    for i in password:
+        if not i.isalpha():
+            hasspecial = True
+        if i.isupper():
+            hascapital = True
+    if not hascapital:
+        return "Error: Password must contain a capital letter."
+    if not hasspecial:
+        return "Error: Password must contain a non-alphabetic character."
+    hashed_password = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
+    password = "Some string to replace the real password"
+    db.insert_user(username, hashed_password, password_client_salt)
+        */
+
         const passwordSalt = res.data;
         const password = $("#password").val()
         const passwordHash = bcrypt.hashSync(password, passwordSalt)
