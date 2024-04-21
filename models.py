@@ -10,7 +10,7 @@ Prisma docs also looks so much better in comparison
 or use SQLite, if you're not into fancy ORMs (but be mindful of Injection attacks :) )
 '''
 
-from sqlalchemy import String, BINARY, JSON
+from sqlalchemy import String, BINARY, ForeignKey, Integer, Boolean, JSON
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from typing import Dict
 
@@ -22,22 +22,27 @@ class Base(DeclarativeBase):
 class User(Base):
     __tablename__ = "user"
     username: Mapped[str] = mapped_column(String, primary_key=True)
-    password_hash = mapped_column(BINARY)
+    password_hash: Mapped[bytes] = mapped_column(BINARY)
     password_client_salt: Mapped[str] = mapped_column(String)
     room_keys = mapped_column(JSON)
-    
-    # looks complicated but basically means
-    # I want a username column of type string,
-    # and I want this column to be my primary key
-    # then accessing john.username -> will give me some data of type string
-    # in other words we've mapped the username Python object property to an SQL column of type String 
 
 class Friend(Base):
     __tablename__ = "friend"
-    id: Mapped[int] = mapped_column(primary_key=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
     frienda: Mapped[str] = mapped_column(String)
     friendb: Mapped[str] = mapped_column(String)
-    accepted: Mapped[bool] = mapped_column()
+    accepted: Mapped[bool] = mapped_column(Boolean)
+    
+    # room_id: Mapped[int] = mapped_column(Integer)
+
+
+class Message(Base):
+    __tablename__ = "message"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    friendship_id: Mapped[int] = mapped_column(ForeignKey("friend.id"))
+    # room_id: Mapped[int] = mapped_column(Integer)
+    username: Mapped[str] = mapped_column(ForeignKey("user.username"))
+    data = mapped_column(JSON)
     
 
 # stateful counter used to generate the room id
@@ -56,25 +61,44 @@ class Room():
         # dictionary that maps the username to the room id
         # for example self.dict["John"] -> gives you the room id of 
         # the room where John is in
-        self.dict: Dict[str, int] = {}
+        self.friends: Dict[int, int] = {}
+        self.users: Dict[str, int] = {}
 
     def create_room(self, sender: str, receiver: str) -> int:
         room_id = self.counter.get()
-        self.dict[sender] = room_id
-        self.dict[receiver] = room_id
+        self.users[sender] = room_id
+        self.users[receiver] = room_id
+        return room_id
+
+    def create_friend_room(self, friend_id) -> int:
+        room_id = self.counter.get()
+        self.friends[friend_id] = room_id
         return room_id
     
     def join_room(self,  sender: str, room_id: int) -> int:
-        self.dict[sender] = room_id
+        self.users[sender] = room_id
 
     def leave_room(self, user):
-        if user not in self.dict.keys():
+        if user not in self.users.keys():
             return
-        del self.dict[user]
+        del self.users[user]
 
     # gets the room id from a user
     def get_room_id(self, user: str):
-        if user not in self.dict.keys():
+        if user not in self.users.keys():
             return None
-        return self.dict[user]
+        return self.users[user]
+    
+    # gets the room id for a friendship, O(1)
+    def get_friend_room_id(self, friend: int):
+        if friend not in self.friends.keys():
+            return None
+        return self.friends[friend]
+
+    # gets the friendship id from a given room number, O(n)
+    def get_friend_from_room(self, room_id):
+        for i in self.friends:
+            if self.friends[i] == room_id:
+                return i
+        return None
     

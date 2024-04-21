@@ -11,6 +11,8 @@ from models import *
 import secrets
 import bcrypt
 import logging
+import base64
+from sys import stdout, stderr
 
 room = Room()
 
@@ -106,7 +108,10 @@ def home():
     username = session_user(session)
     if not username:
         return redirect(url_for("index"))
-    return render_template("home.jinja", username=username)
+    room_id =  room.get_room_id(username)
+    if room_id is None:
+        room_id = -1
+    return render_template("home.jinja", username=username, room_id=room_id)
 
 # Friends list page, where friends are shown and managed
 @app.route("/friends")
@@ -117,7 +122,7 @@ def friends():
     user = db.get_user(username)
     if user is None:
         return redirect(url_for("signup"))
-    friends_list = db.get_friends(username)
+    friends_list = db.get_rels(username)
     friends = ""
     incoming = ""
     outgoing = ""
@@ -181,8 +186,8 @@ def friends_request():
     if friend == username:
         return "Error: You cannot befriend yourself"
     # Get all relationships referencing user
-    friends = db.get_friends(username)
-    for i in friends:
+    relationships = db.get_rels(username)
+    for i in relationships:
         if i.frienda == friend or i.friendb == friend:
             return "Error: Relationship already exists"
     db.insert_friend(username, friend)
@@ -208,7 +213,7 @@ def get_password_client_salt(username):
 @socketio.on('connect')
 def connect():
     username = session_user(session)
-    room_id = request.cookies.get("room_id")
+    room_id = room.get_room_id(username)
     if room_id is None or username is None:
         return
     # socket automatically leaves a room on client disconnect
@@ -228,43 +233,85 @@ def disconnect():
 
 # send message event handler
 @socketio.on("send")
-def send(message):
+def send(message_data):
     username = session_user(session)
     room_id = room.get_room_id(username)
-    emit("incoming", (f"{username}: {message}"), to=room_id)
+    friend_id = room.get_friend_from_room(room_id)
+    emit("incomingEncrypted", (f"{username}: ", message_data), to=room_id)
+    db.log_message(friend_id, username, message_data)
+    
+    
+@socketio.on("publicKey")
+def forward_key(key):
+    username = session_user(session)
+    room_id = room.get_room_id(username)
+    emit("publicKey", key, to=room_id, include_self=False)
+    
+@socketio.on("roomKey")
+def store_key(key):
+    username = session_user(session)
+    room_id = room.get_room_id(username)
+    friend_id = room.get_friend_from_room(room_id)
+    key["encryptedKey"] = bytesToString(key["encryptedKey"])
+    key["iv"] = bytesToString(key["iv"])
+    db.store_room_key(username, friend_id, key)
     
 # join room event handler
 # sent when the user joins a room
 @socketio.on("join")
 def join(receiver_name):
+    response = {
+        "success": 0,
+        "hasKey": 0
+    }
     sender_name = session_user(session)
     receiver = db.get_user(receiver_name)
     if receiver is None:
-        return "Unknown receiver!"
+        response["error"] = "Error: Unknown receiver!"
+        return response
     sender = db.get_user(sender_name)
     if sender is None:
-        return "Unknown sender!"
-
-    room_id = room.get_room_id(receiver_name)
-
-    # if the user is already inside of a room 
-    if room_id is not None:
-        
+        response["error"] = "Error: Unknown sender!"
+        return response
+    
+    # Check if users are friends
+    friend_id = db.friendship_id(sender_name, receiver_name)
+    if friend_id is not None:
+        room_id = room.get_friend_room_id(friend_id)
+        if room_id is None:
+            response["room_id"] = room.create_friend_room(friend_id)
+        else:
+            response["room_id"] = room_id
+            # if we have a key for the room
+            print("\n\n", room_id, friend_id, sender.room_keys, "\n\n")
+            if (sender.room_keys is not None) and (str(friend_id) in sender.room_keys):
+                key = sender.room_keys[str(friend_id)]
+                response["key"] = {
+                    "encryptedKey": stringToBytes(key["encryptedKey"]),
+                    "iv": stringToBytes(key["iv"]),
+                }
+                response["hasKey"] = 1
         room.join_room(sender_name, room_id)
         join_room(room_id)
         # emit to everyone in the room except the sender
         emit("incoming", (f"{sender_name} has joined the room.", "green"), to=room_id, include_self=False)
         # emit only to the sender
         emit("incoming", (f"{sender_name} has joined the room. Now talking to {receiver_name}.", "green"))
-        return room_id
+        if response["hasKey"] == 0:
+            # Ask other person in foom for their public key
+            emit("keyRequest", to=room_id, include_self=False)
+        response["success"] = 1
+        return response
+    response["error"] = "Error: Receiver is not a friend"
+    return response
 
     # if the user isn't inside of any room, 
     # perhaps this user has recently left a room
     # or is simply a new user looking to chat with someone
-    room_id = room.create_room(sender_name, receiver_name)
-    join_room(room_id)
-    emit("incoming", (f"{sender_name} has joined the room. Now talking to {receiver_name}.", "green"), to=room_id)
-    return room_id
+    # room_id = room.create_room(sender_name, receiver_name)
+    # join_room(room_id)
+    # emit("incoming", (f"{sender_name} has joined the room. Now talking to {receiver_name}.", "green"), to=room_id)
+    # return room_id
 
 # leave room event handler
 @socketio.on("leave")
@@ -275,6 +322,17 @@ def leave():
     leave_room(room_id)
     room.leave_room(username)
 
+@socketio.on("history")
+def message_history():
+    username = session_user(session)
+    room_id = room.get_room_id(username)
+    friend_id = room.get_friend_from_room(room_id)
+    for message in db.get_messages(friend_id):
+        message.data["message"] = stringToBytes(message.data["message"])
+        message.data["iv"] = stringToBytes(message.data["iv"])
+        print("message:", message.data["message"])
+        print("iv", message.data["iv"])
+        emit("incomingEncrypted", (f"{message.username}: ", message.data))
 
 
 def session_user(session):
@@ -298,7 +356,11 @@ def username_error(username):
             return "Error: Username contains invalid characters"
     return ""
 
-
+def bytesToString(text: bytes):
+    return base64.b64encode(text).decode("utf-8")
+    
+def stringToBytes(text: str):
+    return base64.b64decode(text.encode("utf-8"))
 
 if __name__ == '__main__':
     # socketio.run(app)

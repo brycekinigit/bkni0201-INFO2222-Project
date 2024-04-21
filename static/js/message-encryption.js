@@ -9,7 +9,7 @@ function decodeText(message) {
 }
 
 async function encryptText(message, key, iv) {
-    return await crypto.subtle.encrypt(
+    let result = await crypto.subtle.encrypt(
         {
             name: "AES-GCM",
             iv: iv,
@@ -17,6 +17,8 @@ async function encryptText(message, key, iv) {
         key,
         encodeText(message)
     );
+    return result;
+    // return decodeText(result);
 }
 
 async function decryptText(encryptedData, key, iv) {
@@ -26,8 +28,10 @@ async function decryptText(encryptedData, key, iv) {
             iv: iv,
         },
         key,
-        encryptedData);
-    return decodeText(result)
+        // encodeText(encryptedData));
+        encryptedData,
+    );
+    return decodeText(result);
 }
 
 async function keyToJSON(key){
@@ -38,13 +42,13 @@ async function keyToJSON(key){
     return keyJSON;
 }
 
-async function keyFromJSON(keyJSON){
+async function keyFromJSON(keyJSON, uses){
     let key = await crypto.subtle.importKey(
         'jwk',
         keyJSON,
         { name: 'AES-GCM' },
         true,
-        ['encrypt', 'decrypt']
+        uses
     );
     return key;
 }
@@ -55,7 +59,7 @@ async function aesKeyFromPassword(password, salt) {
         "raw",
         new TextEncoder().encode(password),
         "PBKDF2",
-        false,
+        true,
         ["deriveBits", "deriveKey"],
     );
     const messageKey = await crypto.subtle.deriveKey(
@@ -80,8 +84,9 @@ async function aesKeyFromPassword(password, salt) {
 // Not adapted to this yet
 
 // derives a shared secret for both users
+
 function deriveSecretKey(privateKey, publicKey) {
-    return window.crypto.subtle.deriveKey(
+    return crypto.subtle.deriveKey(
         {
             name: "ECDH",
             public: publicKey,
@@ -91,51 +96,9 @@ function deriveSecretKey(privateKey, publicKey) {
             name: "AES-GCM",
             length: 256,
         },
-        false,
+        true,
         ["encrypt", "decrypt"],
     );
 }
 
 // NOTE: ECDH (eliptic curve diffie hellman) seems more secure than regular diffie hellman, so probably good to use
-
-async function agreeSharedSecretKey() {
-    // Generate 2 ECDH key pairs: one for Alice and one for Bob
-    // In more normal usage, they would generate their key pairs
-    // separately and exchange public keys securely
-
-    // Generates a key pair
-    let alicesKeyPair = await window.crypto.subtle.generateKey(
-        {
-            name: "ECDH",
-            namedCurve: "P-384",
-        },
-        false,
-        ["deriveKey"],
-    );
-
-    let bobsKeyPair = await window.crypto.subtle.generateKey(
-        {
-            name: "ECDH",
-            namedCurve: "P-384",
-        },
-        false,
-        ["deriveKey"],
-    );
-
-    // Alice then generates a secret key using her private key and Bob's public key.
-    let alicesSecretKey = await deriveSecretKey(
-        alicesKeyPair.privateKey,
-        bobsKeyPair.publicKey,
-    );
-
-    // Bob generates the same secret key using his private key and Alice's public key.
-    let bobsSecretKey = await deriveSecretKey(
-        bobsKeyPair.privateKey,
-        alicesKeyPair.publicKey,
-    );
-
-    console.log("Alice's key: " + alicesSecretKey);
-    console.log("Bob's key: " + bobsSecretKey);
-
-    // Alice can then use her copy of the secret key to encrypt a message to Bob.
-}

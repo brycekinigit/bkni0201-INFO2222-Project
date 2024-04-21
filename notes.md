@@ -7,8 +7,8 @@
 [x] Adding friends
 [x] Friend request approval/denial
 [x] Server cannot read messages (This and next are NOT covered by HTTPS)
-[] Server cannot modify messages (MAC)
-[] Message history stored encrypted in database using user password to decrypt
+[~] Server cannot modify messages (MAC)
+[x] Message history stored encrypted in database using user password to decrypt
 [x] Store passwords properly with hash and salt
 [x] Session Tokens
 [] Make sure that no XSS is possible (ankit on ed said it's possible in scaffold)
@@ -16,10 +16,12 @@
 
 [] Finish UI
 [] check lowercase usernames to make unique
-[] Limit number of people in a room
-[] Move password requirements to client side
+[x] Limit number of people in a room
+[x] Move password requirements to client side
 
-## Misc
+## Last left off
+
+the aes key is different between signing up and logging in, which is strange, because the password works fine
 
 ## Current vulnerabilities
 
@@ -37,3 +39,4 @@ https://www.npmjs.com/package/bcryptjs
 https://cryptography.io/en/latest/hazmat/primitives/key-derivation-functions/
 https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto
 https://flask.palletsprojects.com/en/3.0.x/quickstart/
+https://socket.io/docs/v3/emitting-events/

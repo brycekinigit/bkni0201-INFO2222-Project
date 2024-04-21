@@ -66,7 +66,20 @@
 <script src="/static/js/libs/bcrypt.min.js"></script>
 <script src="/static/js/message-encryption.js"></script>
 <script>
-    let room_id = 0;
+    var room_id = {{ room_id }};
+    let username = "{{ username }}";
+    Cookies.set('username', username);
+
+    // The key used to access encrypted roomKeys from the server
+    var storageKey = sessionStorage.getItem("storageKey");
+    var roomKey = sessionStorage.getItem("roomKey");
+    var exchangeKey = null;
+    var partnerKey = null;
+
+    // Flags used to keep track of where in the key exchange we are up to
+    var roomKeySet = false;
+    var gotKey = false;
+    var sentKey = false;
 
     // when the user presses the "Enter" key inside of the "message box", 
     // the message is sent to the server
@@ -88,86 +101,205 @@
     $(document).ready(() => {
         // room_id is undefined if the user hasn't joined a room
         // we early return in this case
-        if (Cookies.get("room_id") == undefined) {
+
+        if (room_id == -1) {
+            console.log("Room not set");
             return;
         }
+
+        // Don't need this as room comes from server now
+        //if (Cookies.get("room_id") == undefined) {
+        //    console.log("Room cookie not set");
+        //    return;
+        //}
+        //room_id = parseInt(Cookies.get("room_id"));
 
         // the user has already joined an existing room
         // we'll display the message box, instead of the "Chat with: " box
         $("#chat_box").hide();
         $("#input_box").show();
-        room_id = parseInt(Cookies.get("room_id"));
     })
 
     // Here's the Socket IO part of the code
     // things get a bit complicated here so brace yourselves :P
-    let username = "{{ username }}";
-
-    Cookies.set('username', username);
 
     // initializes the socket
     const socket = io();
 
-    // an incoming message arrives, we'll add the message to the message box
+    // When we get an unencrypted incoming message
     socket.on("incoming", (msg, color = "black") => {
         add_message(msg, color);
     })
 
-    // we'll send the message to the server by emitting a "send" event
+    // when we receive an encrypted message
+    socket.on("incomingEncrypted", (userText, messageData, color = "black") => {
+        console.log("Decrypting received message");
+        console.log("IV:", messageData.iv, typeof messageData.iv);
+        console.log("data:", messageData.message, typeof messageData.message);
+        decryptText(messageData.message, roomKey, messageData.iv).then(msg => {
+            add_message(userText + msg, color);
+        }).catch(error => {
+            console.error("Error: decrypting message:", error);
+        });
+    })
+
+    // send the message to the server by emitting a "send" event
     function send() {
         let message = $("#message").val();
-        $("#message").val("");
-        socket.emit("send", message);
+        let iv = crypto.getRandomValues(new Uint8Array(12));
+        console.log("Encrypting message");
+        encryptText(message, roomKey, iv).then(encryptedMessage => {
+            console.log("Encrypted data:", encryptedMessage);
+            socket.emit("send", {
+                message: encryptedMessage,
+                iv: iv,
+            });
+            console.log("Sent message");
+        }).catch(error => {
+            console.error("Error: encrypting message:", error);
+        });
+    }
+
+    function getHistory() {
+        socket.emit("history");
     }
 
     // we emit a join room event to the server to join a room
     function join_room() {
+        // Get storageKey from sessionStorage
+        keyFromJSON(JSON.parse(sessionStorage.getItem("messageKey")), ['encrypt', 'decrypt']).then(key => {
+            storageKey = key;
+            let receiver = $("#receiver").val();
+            // Ask the server to join the person
+            socket.emit("join", receiver, (response) => {
+                console.log("Response from server: ", response);
+                // If we fail to join
+                if (response.success == 0) {
+                    room_id = -1;
+                    alert(response.error);
+                } else {
+                    room_id = response.room;
+                    console.log("Successfully joined server");
+                    $("#chat_box").hide();
+                    $("#input_box").show();
 
-        let receiver = $("#receiver").val();
-
-
-        // pass in the receiver of our message to the server
-        // as well as the current user's username
-        // Find shared secret with partner
-        // Check if shared secret is the same
-        // Encrypt it and send it to server
-        socket.emit("join", receiver, (res) => {
-            // res is a string with the error message if the error occurs
-            // this is a pretty bad way of doing error handling, but watevs
-            if (typeof res != "number") {
-                alert(res);
-                return;
-            }
-
-            // set the room id variable to the room id returned by the server
-            room_id = res;
-            Cookies.set("room_id", room_id);
-
-            var iv = crypto.getRandomValues(new Uint8Array(12));
-            keyFromJSON(JSON.parse(sessionStorage.getItem("messageKey")))
-                .then(key => {
-                    // TODO: Perform key exchange, agree on key, encrypt and send to server
-                    // or get key from server and decrypt it
-                }).catch(error => {
-                    console.error("Error:", error);
-                    alert("Error: Couldn't parse key from sessionStorage");
-                    return;
-                });
-
-            // now we'll show the input box, so the user can input their message
-            $("#chat_box").hide();
-            $("#input_box").show();
+                    // If the response from the server contains an encrypted key
+                    if (response.hasKey == 1) {
+                        console.log("Decrypting roomKey from server");
+                        decryptText(response.key.encryptedKey, storageKey, response.key.iv).then(keyText => {
+                            console.log("decrypted key:", keyText, typeof keyText);
+                            keyFromJSON(JSON.parse(keyText), ['encrypt', 'decrypt']).then(key => {
+                                roomKey = key;
+                                roomKeySet = true;
+                            });
+                        });
+                    }
+                    // If connecting for the first time, exchange public keys and generate a new roomKey
+                    else {
+                        add_message("Beginning key exchange.", color = "blue");
+                        console.log("Generating new roomKey");
+                        window.crypto.subtle.generateKey(
+                            {
+                                name: "ECDH",
+                                namedCurve: "P-384",
+                            },
+                            true,
+                            ['deriveBits', 'deriveKey'],
+                        ).then(result => {
+                            exchangeKey = result;
+                            keyToJSON(exchangeKey.publicKey).then(exportedKey => {
+                                console.log("Sent key:", JSON.stringify(exportedKey));
+                                socket.emit("publicKey", exportedKey);
+                                sentKey = true;
+                                trySecret();
+                            }).catch(error => {
+                                console.error("Error: sending key:", error);
+                            });
+                        });
+                    }
+                }
+            });
+        }).catch(error => {
+            console.error("Error, could not find key in sessionStorage:", error);
+            alert("Couldn't find stores key from login");
         });
-
     }
+
+
+    socket.on("publicKey", (key) => {
+        gotKey = true;
+        console.log(key.crv);
+        console.log("Got key:", JSON.stringify(key));
+        crypto.subtle.importKey(
+            'jwk',
+            key,
+            {
+                name: 'ECDH',
+                namedCurve: "P-384",
+            },
+            true,
+            [],
+        ).then(result => {
+            partnerKey = result;
+            console.log("Successfully imported key");
+            trySecret();
+        }).catch(error => {
+            console.error("Error: getting public key:", error);
+        });
+    });
+
+    // Ask the other person for their public key, if we're the second one to join
+    socket.on("keyRequest", () => {
+        if (exchangeKey != null) {
+            keyToJSON(exchangeKey.publicKey).then(exportedKey => {
+                console.log("Sent requested key:", JSON.stringify(exportedKey));
+                socket.emit("publicKey", exportedKey);
+                sentKey = true;
+            }).catch(error => {
+                console.error("Error: sending key:", error);
+            });
+        }
+    });
+
+    // Try and generate the shared secret with the other person
+    async function trySecret() {
+        if (roomKeySet == false) {
+            if (sentKey) {
+                if (gotKey) {
+                    console.log("Beginning secret generation");
+                    console.log("Key object types:", typeof exchangeKey.privateKey, typeof partnerKey);
+                    roomKey = await deriveSecretKey(exchangeKey.privateKey, partnerKey);
+                    let jsonRoomKey = await keyToJSON(roomKey)
+                    let iv = crypto.getRandomValues(new Uint8Array(12));
+                    let encryptedKey = await encryptText(JSON.stringify(jsonRoomKey), storageKey, iv);
+                    socket.emit("roomKey", {
+                        encryptedKey: encryptedKey,
+                        iv: iv,
+                    });
+                    roomKeySet = true;
+                    add_message("Completed key exchange.", color = "blue");
+                    console.log("Finished secret generation");
+                } else {
+                    console.log("No Exchange: Key not received.")
+                }
+            } else {
+                console.log("No Exchange: Key not sent.");
+            }
+        } else {
+            console.log("No Exchange: Already have roomKey");
+        }
+    }
+
 
     // function when the user clicks on "Leave Room"
     // emits a "leave" event, telling the server that we want to leave the room
     function leave() {
-        Cookies.remove("room_id");
-        socket.emit("leave");
+        room_id = -1;
+        gotKey = false;
+        sentKey = false;
         $("#input_box").hide();
         $("#chat_box").show();
+        socket.emit("leave");
     }
 
     // function to add a message to the message box
