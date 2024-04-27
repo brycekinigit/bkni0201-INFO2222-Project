@@ -2,3 +2,5 @@ database
 __pycache__
 report/project-report.pdf
 report/project-report.synctex.gz
+report/project-report.fdb_latexmk
+report/project-report.log
