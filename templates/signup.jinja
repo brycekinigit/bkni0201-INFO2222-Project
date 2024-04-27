@@ -33,52 +33,65 @@ Sign up page, pretty much the same as login.
     async function signup() {
         let loginURL = "{{ url_for('signup_user') }}"
 
-        // resets elements after for next password check warnings
-        document.getElementById("capitalError").style.visibility="hidden";
-        document.getElementById("specialError").style.visibility="hidden";
 
         let password = $("#password").val()
-        let hasspecial = false;
-        let hascapital = false;
+        let hasCapital = false;
+        let hasSpecial = false;
 
-        for (let i = 0; i < password.length; i++)
-        {
-            // https://stackoverflow.com/a/9862788 (regex check if string is in alphabet)
-            if (!password[i].match(/[a-z]/i))
-            {
-                hasspecial = true;
-            }
-            
-            if (password[i].match(/[a-z]/i))
-            {
-                if (password[i] == password[i].toUpperCase())
-                {
-                    hascapital = true;
+        // resets elements after for next password check warnings
+        // document.getElementById("capitalError").style.visibility="hidden";
+        // document.getElementById("specialError").style.visibility="hidden";
+        // for (let i = 0; i < password.length; i++)
+        // {
+        //     // https://stackoverflow.com/a/9862788 (regex check if string is in alphabet)
+        //     if (!password[i].match(/[a-z]/i))
+        //     {
+        //         hasspecial = true;
+        //     }
+        //     
+        //     if (password[i].match(/[a-z]/i))
+        //     {
+        //         if (password[i] == password[i].toUpperCase())
+        //         {
+        //             hascapital = true;
+        //         }
+        //     }
+        // }
+
+        let alphabet = "abcdefghijklmnopqrstuvwxyz"
+        // Block any characters other than these, same as in username, except space is allowed. (see username validation function in app.py)
+        let allowedSpecialChars = " 0123456789,.?!@#$%^&*()-_=+"
+        for (let i = 0; i < password.length; i++) {
+            if (alphabet.includes(password[i].toLowerCase())) {
+                if (password[i] == password[i].toUpperCase()) {
+                    hasCapital = true;
                 }
+            } else if (allowedSpecialChars.includes(password[i])) {
+                hasSpecial = true;
             }
         }
-
-        if (!hascapital)
-        {
-            document.getElementById("capitalError").style.visibility="visible";
-            console.log("Error: Password must contain a capital letter.");
+        if (password.length < 6) {
+            alert("Password must be at least 6 characters long.");
+            return;
+        }
+        if (!hasCapital) {
+            alert("Password must contain a capital letter.");
+            return;
+        }
+        else if (!hasSpecial) {
+            alert("Password must contain a non-alphabetic character.");
             return;
         }
 
-        if (!hasspecial)
-        {
-            document.getElementById("specialError").style.visibility="visible";
-            console.log("Error: Password must contain a non-alphabetic character.");
-            return;
-        }
         const passwordSalt = bcrypt.genSaltSync();
         const passwordHash = bcrypt.hashSync($("#password").val(), passwordSalt)
-        
+
+        console.log("out salt:", "<"+passwordSalt+">", typeof passwordSalt);
+
         // Generate public and private key from password
-        
         const messageKey = await aesKeyFromPassword(password, passwordSalt);
         const keyJSON = await keyToJSON(messageKey);
-        sessionStorage.setItem("messageKey", JSON.stringify(keyJSON));
+        sessionStorage.setItem("storageKey", JSON.stringify(keyJSON));
 
 
         let res = await axios.post(loginURL, {

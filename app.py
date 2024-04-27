@@ -77,19 +77,19 @@ def signup_user():
         return "Error: User already exists!"
     
     # check password
-    if (not password) or len(password) < 6:
+    if (not password) or len(password) < 10:
         return "Error: Password too short."
-    hasspecial = False
-    hascapital = False
-    for i in password:
-        if not i.isalpha():
-            hasspecial = True
-        if i.isupper():
-            hascapital = True
-    if not hascapital:
-        return "Error: Password must contain a capital letter."
-    if not hasspecial:
-        return "Error: Password must contain a non-alphabetic character."
+    # hasspecial = False
+    # hascapital = False
+    # for i in password:
+    #     if not i.isalpha():
+    #         hasspecial = True
+    #     if i.isupper():
+    #         hascapital = True
+    # if not hascapital:
+    #     return "Error: Password must contain a capital letter."
+    # if not hasspecial:
+    #     return "Error: Password must contain a non-alphabetic character."
     hashed_password = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
     password = "Some string to replace the real password"
     db.insert_user(username, hashed_password, password_client_salt)
@@ -108,10 +108,17 @@ def home():
     username = session_user(session)
     if not username:
         return redirect(url_for("index"))
-    room_id =  room.get_room_id(username)
-    if room_id is None:
-        room_id = -1
-    return render_template("home.jinja", username=username, room_id=room_id)
+    # room_id =  room.get_room_id(username)
+    # if room_id is None:
+    #     room_id = -1
+    return render_template("home.jinja", username=username, room_id=-1, partner="")
+
+@app.route("/home/<partner>")
+def home_partner(partner):
+    username = session_user(session)
+    if not username:
+        return redirect(url_for("index"))
+    return render_template("home.jinja", username=username, room_id=-1, partner=partner)
 
 # Friends list page, where friends are shown and managed
 @app.route("/friends")
@@ -130,9 +137,9 @@ def friends():
         if i.accepted:
             # put relationship the right way
             if i.frienda != username:
-                friends += f"<li>{i.frienda}</li>"
+                friends += f"<li><a href=\"{url_for('home')}/{i.frienda}\">{i.frienda}</a></li>"
             else:
-                friends += f"<li>{i.friendb}</li>"
+                friends += f"<li><a href=\"{url_for('home')}/{i.friendb}\">{i.friendb}</a></li>"
         # If request is to user
         elif i.friendb == username:
             incoming += f"<li>{i.frienda} <button onclick=\"accept_request({i.id});\">Accept</button> <button onclick=\"reject_request({i.id});\">Reject</button></li>"
@@ -195,31 +202,32 @@ def friends_request():
 
 
 
-@app.route("/user/password-message-salt/<username>")
-def get_password_client_salt(username):
-    # if not request.is_json:
-    #     abort(404)
-    # if username_error(username):
-    #     return "Error: Invalid username"
+@app.route("/user/client-salt")
+def get_password_client_salt():
+    username = request.args.get("username")
+    if username_error(username):
+        return ""
     user = db.get_user(username)
     if not user:
-        return f"Error: No user named \"{username}\"."
+        return ""
     return user.password_client_salt
 
 
 
 # when the client connects to a socket
 # this event is emitted when the io() function is called in JS
-@socketio.on('connect')
-def connect():
-    username = session_user(session)
-    room_id = room.get_room_id(username)
-    if room_id is None or username is None:
-        return
-    # socket automatically leaves a room on client disconnect
-    # so on client connect, the room needs to be rejoined
-    join_room(int(room_id))
-    emit("incoming", (f"{username} has connected", "green"), to=int(room_id))
+# @socketio.on('connect')
+# def connect():
+#     username = session_user(session)
+#     room_id = room.get_room_id(username)
+#     if room_id is None or username is None:
+#         return
+#     # socket automatically leaves a room on client disconnect
+#     # so on client connect, the room needs to be rejoined
+#     # join_room(int(room_id))
+#     # message_history()
+#     # emit("incoming", (f"{username} has connected", "green"), to=int(room_id))
+    
 
 # event when client disconnects
 # quite unreliable use sparingly
@@ -229,7 +237,8 @@ def disconnect():
     room_id = room.get_room_id(username)
     if room_id is None or username is None:
         return
-    emit("incoming", (f"{username} has disconnected", "red"), to=int(room_id))
+    room.leave_room(username)
+    emit("incoming", (f"{username} has left the room. (disconnected)", "red"), to=room_id)
 
 # send message event handler
 @socketio.on("send")
@@ -237,7 +246,7 @@ def send(message_data):
     username = session_user(session)
     room_id = room.get_room_id(username)
     friend_id = room.get_friend_from_room(room_id)
-    emit("incomingEncrypted", (f"{username}: ", message_data), to=room_id)
+    emit("incomingEncrypted", (0, f"{username}: ", message_data), to=room_id)
     db.log_message(friend_id, username, message_data)
     
     
@@ -246,6 +255,15 @@ def forward_key(key):
     username = session_user(session)
     room_id = room.get_room_id(username)
     emit("publicKey", key, to=room_id, include_self=False)
+    print("Forwarded a public key")
+
+# Not needed as server handles requesting public keys automatically
+# @socketio.on("publicKeyRequest")
+# def request_key():
+#     username = session_user(session)
+#     room_id = room.get_room_id(username)
+#     emit("publicKeyRequest", to=room_id, include_self=False)
+#     print("Forwarded a request for public key")
     
 @socketio.on("roomKey")
 def store_key(key):
@@ -277,41 +295,34 @@ def join(receiver_name):
     # Check if users are friends
     friend_id = db.friendship_id(sender_name, receiver_name)
     if friend_id is not None:
+        # If there isn't a room for this pair, create one
         room_id = room.get_friend_room_id(friend_id)
         if room_id is None:
-            response["room_id"] = room.create_friend_room(friend_id)
-        else:
-            response["room_id"] = room_id
-            # if we have a key for the room
-            print("\n\n", room_id, friend_id, sender.room_keys, "\n\n")
-            if (sender.room_keys is not None) and (str(friend_id) in sender.room_keys):
-                key = sender.room_keys[str(friend_id)]
-                response["key"] = {
-                    "encryptedKey": stringToBytes(key["encryptedKey"]),
-                    "iv": stringToBytes(key["iv"]),
-                }
-                response["hasKey"] = 1
+            room_id = room.create_friend_room(friend_id)
+        # If the sender already has a key stored in the database
+        if (sender.room_keys is not None) and (str(friend_id) in sender.room_keys):
+            key = sender.room_keys[str(friend_id)]
+            response["key"] = {
+                "encryptedKey": stringToBytes(key["encryptedKey"]),
+                "iv": stringToBytes(key["iv"]),
+            }
+            response["hasKey"] = 1
+        response["room_id"] = room_id
         room.join_room(sender_name, room_id)
         join_room(room_id)
         # emit to everyone in the room except the sender
         emit("incoming", (f"{sender_name} has joined the room.", "green"), to=room_id, include_self=False)
-        # emit only to the sender
+        # emit to just the sender
         emit("incoming", (f"{sender_name} has joined the room. Now talking to {receiver_name}.", "green"))
+        
         if response["hasKey"] == 0:
-            # Ask other person in foom for their public key
-            emit("keyRequest", to=room_id, include_self=False)
+            # Ask other people in the room for their public keys
+            emit("publicKeyRequest", to=room_id, include_self=False)
         response["success"] = 1
+        print("Returning join response")
         return response
     response["error"] = "Error: Receiver is not a friend"
     return response
-
-    # if the user isn't inside of any room, 
-    # perhaps this user has recently left a room
-    # or is simply a new user looking to chat with someone
-    # room_id = room.create_room(sender_name, receiver_name)
-    # join_room(room_id)
-    # emit("incoming", (f"{sender_name} has joined the room. Now talking to {receiver_name}.", "green"), to=room_id)
-    # return room_id
 
 # leave room event handler
 @socketio.on("leave")
@@ -323,17 +334,18 @@ def leave():
     room.leave_room(username)
 
 @socketio.on("history")
-def message_history():
+def message_history(partner):
     username = session_user(session)
+    if not username:
+        return
+    print(f"Sending history for {username}")
     room_id = room.get_room_id(username)
     friend_id = room.get_friend_from_room(room_id)
     for message in db.get_messages(friend_id):
+        # print("Sent a past message")
         message.data["message"] = stringToBytes(message.data["message"])
         message.data["iv"] = stringToBytes(message.data["iv"])
-        print("message:", message.data["message"])
-        print("iv", message.data["iv"])
-        emit("incomingEncrypted", (f"{message.username}: ", message.data))
-
+        emit("incomingEncrypted", (1, f"{message.username}: ", message.data))
 
 def session_user(session):
     '''
@@ -346,13 +358,15 @@ def session_user(session):
 
 def username_error(username):
     '''
-    Returns an empty string if the username is valid, or an appropriate error message if not
+    Returns an empty string if the username is valid, or an appropriate error message if not.
+    Allowed non-alphabetic characters are: 0123456789,.?!@#$%^&*()-_=+
+    notably excluding html and json syntax, and backslash for escape characters </>, {"":[]}, \\
     '''
     if len(username) < 3:
         return "Error: Username too short."
-    valid_characters = "?!@#$%^&*()-_+"
+    allowed_special_chars = "0123456789,.?!@#$%^&*()-_=+"
     for i in username:
-        if not (i.isalpha() or i.isnumeric or i in valid_characters):
+        if not (i.isalpha() or i in allowed_special_chars):
             return "Error: Username contains invalid characters"
     return ""
 

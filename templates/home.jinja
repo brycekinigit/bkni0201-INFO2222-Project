@@ -40,7 +40,13 @@
 
 <main>
     <!-- The messages are displayed here -->
-    <section id="message_box"></section>
+    <section id="message_box">
+        <section id="message_box_history">
+        </section>
+        <hr>
+        <section id="message_box_current">
+        </section>
+    </section>
 
     <!-- These part ideally should be a form element, 
     but I wrote this code a year ago and I don't want to break anything...-->
@@ -49,7 +55,7 @@
         <input id="receiver" placeholder="username">
         <!-- MDN says its bad practice to use the onclick attribute,
         but we're using it anyways coz its easy :)-->
-        <button onclick="join_room()">Chat</button>
+        <button onclick="join_room_from_box()">Chat</button>
     </section>
 
     <!-- The (message) input box is set to display: none initially, 
@@ -68,6 +74,7 @@
 <script>
     var room_id = {{ room_id }};
     let username = "{{ username }}";
+    let partner = "{{ partner }}"
     Cookies.set('username', username);
 
     // The key used to access encrypted roomKeys from the server
@@ -93,19 +100,23 @@
     // the user joins a (socket) room
     $("#receiver").on("keyup", (e) => {
         if (e.key == "Enter") {
-            join_room();
+            join_room_from_box();
         }
     })
 
 
     $(document).ready(() => {
-        // room_id is undefined if the user hasn't joined a room
-        // we early return in this case
-
-        if (room_id == -1) {
-            console.log("Room not set");
-            return;
+        // if we have set a partner already
+        if (partner.length >= 3) {
+            join_room(partner);
         }
+
+
+        // Don't need this, as we leave rooms on each disconnection
+        // if (room_id == -1) {
+        //     console.log("Room not set");
+        //     return;
+        // }
 
         // Don't need this as room comes from server now
         //if (Cookies.get("room_id") == undefined) {
@@ -116,8 +127,8 @@
 
         // the user has already joined an existing room
         // we'll display the message box, instead of the "Chat with: " box
-        $("#chat_box").hide();
-        $("#input_box").show();
+        // $("#chat_box").hide();
+        // $("#input_box").show();
     })
 
     // Here's the Socket IO part of the code
@@ -132,12 +143,16 @@
     })
 
     // when we receive an encrypted message
-    socket.on("incomingEncrypted", (userText, messageData, color = "black") => {
+    socket.on("incomingEncrypted", (isHistory, userText, messageData, color = "black") => {
         console.log("Decrypting received message");
         console.log("IV:", messageData.iv, typeof messageData.iv);
         console.log("data:", messageData.message, typeof messageData.message);
         decryptText(messageData.message, roomKey, messageData.iv).then(msg => {
-            add_message(userText + msg, color);
+            if (isHistory) {
+                add_history(userText + msg, color);
+            } else {
+                add_message(userText + msg, color);
+            }
         }).catch(error => {
             console.error("Error: decrypting message:", error);
         });
@@ -160,16 +175,19 @@
         });
     }
 
-    function getHistory() {
-        socket.emit("history");
+    function join_room_from_box() {
+        join_room($("#receiver").val());
     }
 
     // we emit a join room event to the server to join a room
-    function join_room() {
+    function join_room(receiver) {
+        console.log("Trying to join room");
         // Get storageKey from sessionStorage
-        keyFromJSON(JSON.parse(sessionStorage.getItem("messageKey")), ['encrypt', 'decrypt']).then(key => {
+        keyFromJSON(JSON.parse(sessionStorage.getItem("storageKey")), ['encrypt', 'decrypt']).then(key => {
             storageKey = key;
-            let receiver = $("#receiver").val();
+            // Clear the message box
+            $("#message_box_history").empty();
+            $("#message_box_current").empty();
             // Ask the server to join the person
             socket.emit("join", receiver, (response) => {
                 console.log("Response from server: ", response);
@@ -179,11 +197,10 @@
                     alert(response.error);
                 } else {
                     room_id = response.room;
-                    console.log("Successfully joined server");
+                    console.log("Successfully joined room", room_id);
                     $("#chat_box").hide();
-                    $("#input_box").show();
 
-                    // If the response from the server contains an encrypted key
+                    // If the response from the server contains an encrypted roomKey
                     if (response.hasKey == 1) {
                         console.log("Decrypting roomKey from server");
                         decryptText(response.key.encryptedKey, storageKey, response.key.iv).then(keyText => {
@@ -191,12 +208,15 @@
                             keyFromJSON(JSON.parse(keyText), ['encrypt', 'decrypt']).then(key => {
                                 roomKey = key;
                                 roomKeySet = true;
+                                console.log("Successfully set room key");
+                                $("#input_box").show();
+                                console.log("Asking for message history");
+                                socket.emit("history", partner);
                             });
                         });
                     }
                     // If connecting for the first time, exchange public keys and generate a new roomKey
                     else {
-                        add_message("Beginning key exchange.", color = "blue");
                         console.log("Generating new roomKey");
                         window.crypto.subtle.generateKey(
                             {
@@ -228,7 +248,6 @@
 
     socket.on("publicKey", (key) => {
         gotKey = true;
-        console.log(key.crv);
         console.log("Got key:", JSON.stringify(key));
         crypto.subtle.importKey(
             'jwk',
@@ -248,16 +267,18 @@
         });
     });
 
-    // Ask the other person for their public key, if we're the second one to join
-    socket.on("keyRequest", () => {
+    // When asked to, we send our public key, if the partner hadn't joined the room yet
+    socket.on("publicKeyRequest", () => {
         if (exchangeKey != null) {
             keyToJSON(exchangeKey.publicKey).then(exportedKey => {
-                console.log("Sent requested key:", JSON.stringify(exportedKey));
+                console.log("Responded to key request:", JSON.stringify(exportedKey));
                 socket.emit("publicKey", exportedKey);
                 sentKey = true;
             }).catch(error => {
                 console.error("Error: sending key:", error);
             });
+        } else {
+            console.log("Couldn't respond to key request");
         }
     });
 
@@ -277,13 +298,14 @@
                         iv: iv,
                     });
                     roomKeySet = true;
-                    add_message("Completed key exchange.", color = "blue");
+                    $("#input_box").show();
                     console.log("Finished secret generation");
                 } else {
-                    console.log("No Exchange: Key not received.")
+                    add_message("Waiting for partner to join.", color = "blue");
+                    console.log("No Exchange: Key not received yet")
                 }
             } else {
-                console.log("No Exchange: Key not sent.");
+                console.log("No Exchange: Key not sent yet");
             }
         } else {
             console.log("No Exchange: Already have roomKey");
@@ -305,7 +327,13 @@
     // function to add a message to the message box
     // called when an incoming message has reached a client
     function add_message(message, color) {
-        let box = $("#message_box");
+        let box = $("#message_box_current");
+        let child = $(`<p style="color:${color}; margin: 0px;"></p>`).text(message);
+        box.append(child);
+    }
+
+    function add_history(message, color) {
+        let box = $("#message_box_history");
         let child = $(`<p style="color:${color}; margin: 0px;"></p>`).text(message);
         box.append(child);
     }

@@ -41,34 +41,24 @@
         let loginURL = "{{ url_for('login_user') }}";
 
         const username = $("#username").val()
-        let res = await axios.get("/user/password-message-salt/" + username, {
-            username: username,
+        let res = await axios.get("/user/client-salt", {
+            params: {
+                username:username
+            }
         });
-
-        /*
-    hasspecial = False
-    hascapital = False
-    for i in password:
-        if not i.isalpha():
-            hasspecial = True
-        if i.isupper():
-            hascapital = True
-    if not hascapital:
-        return "Error: Password must contain a capital letter."
-    if not hasspecial:
-        return "Error: Password must contain a non-alphabetic character."
-    hashed_password = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
-    password = "Some string to replace the real password"
-    db.insert_user(username, hashed_password, password_client_salt)
-        */
-
         const passwordSalt = res.data;
+        // If we didn't get a valid salt
+        console.log(passwordSalt, typeof passwordSalt);
+        if (passwordSalt.length <= 1) {
+            alert("Error: Username is incorrect.");
+            return;
+        }
+        console.log("got salt:", "<"+passwordSalt+">", typeof passwordSalt);
         const password = $("#password").val()
-        const passwordHash = bcrypt.hashSync(password, passwordSalt)
-
+        const passwordHash = await bcrypt.hashSync(password, passwordSalt);
         const messageKey = await aesKeyFromPassword(password, passwordSalt);
         const keyJSON = await keyToJSON(messageKey);
-        sessionStorage.setItem("messageKey", JSON.stringify(keyJSON));
+        sessionStorage.setItem("storageKey", JSON.stringify(keyJSON));
 
         // axios post is a fancy way of posting a request to the server,
         // we pass in the username and password here

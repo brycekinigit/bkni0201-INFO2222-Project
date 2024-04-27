@@ -1,5 +1,6 @@
 \documentclass[12pt]{article}
 
+\usepackage{parskip}
 \usepackage[margin=2.7cm,a4paper]{geometry} % Page formatting
 \usepackage{multicol} % For multi-column sections
 \usepackage{graphicx} % For including images
@@ -23,18 +24,26 @@
 \usepackage[noend]{algpseudocode} % Pseudocode
 \usepackage[tikz]{mdframed} % Outlined pseudocode
 
+\newcommand{\bryce}{\hfill\normalsize\sc [bkni0201]}
+\newcommand{\kai}{\hfill\normalsize\sc [kwal3204]}
+
+\newcommand{\ekey}{\textsc{exchangeKey} }
+\newcommand{\rkey}{\textsc{roomKey} }
+\newcommand{\skey}{\textsc{storageKey} }
+
+
 \begin{document}
-%\tableofcontents
 
-\section{Signing up}
+\tableofcontents
+\newpage
 
-\subsection{Client}
+\section[Signup And Login]{Signing Up And Logging In \bryce}
 
-On the client side, we take a hash of the password, and use that as the password to authenticate logging in. This means the true password is still secure, even if the server is malicious and logs all passwords. The reason for this is made clear later, when we need a new key to be kept secret from the server, with only the user's password. When we hash the password, the salt is sent separately to the server so that it can be accessed later when logging in again. Reasoning is given in the \textbf{Malicious Server} section for why we can allow this salt to be accessed publicly.
+A number of steps are shared between the signing up and logging in processes, so they are joined to be one section.
 
-\subsection{Server}
+The user enters a username and password, and submits them. When this is done, the client will pre-hash the password, using that as the "true" password for authentication, and also derive an AES encryption/decryption key from the original password, which we refer to as \skey. More explanation and for this is provided in later sections.
 
-The only time the server has the raw password for a user is in the moment when they sign up, and when they sign in. To minimise the risk of any leaks, we deal with the password as quickly as possible. For signing up, this means we check the password meets some conditions, then hash it and store it in the database, and actually deleting the password variable just in case.
+When a user signs up, the password is then checked against a few conditions. This must be done client-side, as the original password must not be seen by the server, so the requirements cannot be truly enforced.
 
 We decided that some reasonable password requirements were:
 
@@ -44,88 +53,155 @@ We decided that some reasonable password requirements were:
     \item Must contain at least 1 non-alphabetic character (number or special character)
 \end{itemize}
 
-\section{Logging in}
+We limited the available characters to letters, numbers, and certain select special characters, including the shift-variants of each of the numbers, but not any that could form HTML or JSON syntax, so no angle brackets, curly brackets, colons or slashes. This was technically unnecessary, as with a password, no XSS is possible unless self-inflicted, but was used to maintain consistencty with the restrictions of usernames. The only difference being spaces are allowed in passwords.
 
+To generate \skey, we use PBKDF2 on the original password, introducing more entropy and taking more computation, making it difficult to decrypt. the PBKDF2 key material is then used to generate an AES-GCM key. This key is the same for each login, and is kept secret the server. PBKDF2 was chosen as it is the only reasonable option supported by \textsc{deriveKey()} in the web cryptography API, and AES-GCM was used because it familiar and known to be secure from the course content so far, and because we already use it for message encryption.
 
+To allow the key to be used across pages during a session, it is stored locally in sessionStorage immediately upon logging in. This key is useless to anyone but the server, as communications are encrypted and verified first by HTTPS, so does not need to be kept totally secure from outside attackers.
 
-\section{Friends}
+The username and pre-hashed password are sent to the server via a POST request, where the server validates the username. Our requirements for usernames were: 
+
+\begin{itemize}
+    \item Must be at least 3 characters long
+    \item Can only contain letters, numbers, and select special characters
+\end{itemize}
+
+We decided 3 was a reasonable minimum to prevent bugs with empty strings, and allowed Alice and Bob to be used for testing. The special characters we allowed were chosen to prevent any kind of HTML or JSON syntax, to prevent XSS.
+
+\section[Friends]{Friends \bryce}
 
 Friend requests and relationships are stored in the database as Friend objects, with an integer primary key, frienda, representing the sender, friendb, representing the receiver, and accepted, a boolean value representing whether or not a friend request has been accepted. With this, incoming, outgoing, and existing friends can simply be kept track of in a single database, with each action being a simple change.
-\newline
 
-\noindent \textbf{Friends:} All Friends where (frienda or friendb = username) and accepted = True
-\newline
+\textbf{Friends:} All Friends where (frienda or friendb = username) and accepted = True
 
-\noindent \textbf{Incoming:} All Friends where friendb = username and accepted = False
-\newline
+\textbf{Incoming:} All Friends where friendb = username and accepted = False
 
-\noindent \textbf{Outgoing:} All Friends where frienda = username and accepted = False
-\newline
+\textbf{Outgoing:} All Friends where frienda = username and accepted = False
 
-\noindent \textbf{Request:} friends.add(Friend(username, recipient, False))
-\newline
+\textbf{Request:} friends.add(Friend(username, recipient, False))
 
-\noindent \textbf{Accept:} friends.get(id).accepted = True
-\newline
+\textbf{Accept:} friends.get(id).accepted = True
 
-\noindent \textbf{Reject:} friends.delete(id)
+\textbf{Reject:} friends.delete(id)
 
-\section{Chatting}
-\section{Message Encryption \& History}
+\section[Messaging]{Messaging \bryce}
 
-\section{Malicious Server}
+For messaging, the client will generate 3 different cryptographic keys
 
-For the purposes of this section, we'll assume that the server is entirely malicious, and cannot be trusted. We'll also assume that two given users are able to verify each others identity, and that the server isn't directly pretending to be the other user.
+\ekey is a public-private ECDH (Eliptic Curve Diffie Hellman) key pair which is used when 2 users first establish communications, to agree on a shared secret, from which the \textsc{roomKey} will be derived.
 
-\subsection{Password}
+\rkey is actually something of a misnomer, as it is unique to the friendship id of 2 users, not the room they are in, which can change between server restarts. This is a symmetric AES-GCM encryption/decryption key derived from a shared secret, and is used to encrypt all messages between users end-to-end.
 
-This means that the server can retain the raw login credentials sent to it. The server must not be allowed to read user's messages, requiring that they be a step more secure than the login credentials.
+\skey is derived from the users password, and the same salt value used to pre-hash the password. It is not stored, but re-generated upon each login, but giving the same final key. This is an AES-GCM key, which is only used for encrypting \rkey to store them on the server.
 
-To accomplish this, on the client side, we hash the password, and use that hash as the login password for the server. The salt here is also sent to the server, which the server makes available publicly through GET requests, so that the user can access it while (before) logging in. This salt does not need to be kept secret, and only exists for the purposes of preventing rainbow table attacks. This same salt is also used when generating the secret \textbf{user message key} upon each login, so that stays the same across logins.
+\subsection{Joining a room}
 
-\subsection{User message key}
+To start messaging someone, the client sends a join request to the server, which, if they are friends with the recipient, will allocate them to a room. At the time of this submission, rooms can have 2 types, a general room (currently not used), or a friend room, which uniquely refers to the friendship id of a pair of users.
 
-When the user logs in, the browser generates a key from the password, whose only use is to encrypt shared secrets agreed upon when messaging another users, so that message history can be accessed across subsequent sessions.
+The server builds a response to the request, including a flag representing whether it was successful, a room number if applicable, a flag indicating whether there is a stored encrypted room key and the key if applicable, and an (initially empty) error message.
 
-We cannot necessarily store any permanent data on the user's machine, but the server cannot be allowed to know the means to decrypt user's messages. The solution to this problem is to, on each login, generate a key that will be used to encrypt the room master decryption keys before they are stored in the server's database.
+\subsubsection{Case 1: No Stored Key}
 
-This is done using PBKDF2, introducing more entropy and taking more computation, making it difficult to decrypt. the PBKDF2 key material is then used to generate an AES-GCM key. This key is the same for each login, and is kept secret the server.
+If this is the first time 2 users have communicated, they each independently generate a new \ekey, and exchange the public key component, using their private key and the exchanged public key to generate a shared secret, which is then used to derive \rkey.
 
-To allow the key to be used across pages during a session, it is stored locally in sessionStorage immediately upon logging in. This key is useless to anyone but the server, as communications are encrypted and verified first by HTTPS, so does not need to be kept from outside attackers, just the server. The only circumstances under which the server can even see the key is if page sends it back to the server, which a user can see and potentially stop.
+When a user joins a room, their client broadcasts their public key to everyone else in the room, then the server automatically sends a message to the other users in the room, asking them to send their public key again, so that the second person to join a room will still receive the needed key. Upon each of these operations, the client checks if it has both sent and received a key, at which point it derives \rkey and begins allowing messages.
 
-\section{HTTPS}
+Once \rkey is generated, is is exported to a json object, stringified, encrypted using \skey, and sent to the server, which stores it in the user database table with an associated friendship id.
+
+\subsubsection{Case 2: Stored Key}
+
+If a user joins a room, and the server has an encrypted \rkey stored, the client can decrypt it using the \skey they derive upon each login, parse the json, and import it as a cryptographic key. When this is accomplished, the user is allowed to begin sending messages immediately, even if the other user isn't online.
+
+\section[Encryption]{Message Encryption \bryce}
+
+Before being sent, each message us encrypted using AES-GCM. With each message, we also generate an initialisation vector (IV) which is used in encrypting the message, and sent with the ciphertext. The IV patterns in the plaintext aren't translated to the ciphertext. Since two messages with the same content, will still have different IVs, the ciphertext is not the same.
+
+AES-GCM was chosen because:
+\begin{itemize}
+    \item It was familiar from the course content, and known to be secure.
+    \item GCM specifically was chosen because it includes a MAC natively.
+    \item It is one of the few options supported by \textsc{deriveKey()} from the web cryptography API.
+\end{itemize}
+
+The encrypted message and IV are then stored in a single JSON object, and sent via the \textsc{send} socket command, which the server forwards as \textsc{incomingEncrypted} as opposed to \textsc{incoming} which is used for non-encrypted status messages from the server.
+
+\section[History]{Message History \bryce}
+
+Every time an encrypted message is sent, the server logs the encrypted message, with a sequential id, the friendship id representing the pair of users, and the sender's username. This information is appended to a table in the database to be stored permanently.
+
+At any time, a client can request the message history between them and their counterpart, which the server will respond to by running a database query for all messages with the associated friendship id, and sequentially sends them to the user, with each message containing a flag indicating it is a past message.
+
+In the messaging window, where are 2 subsections separated by a horizontal rule. The top section is reserved for past messages, so any message with the appropriate flag is appended to that section, while all status and new messages are placed in the other, lower section.
+
+\section[HTTPS]{HTTPS \bryce}
 
 To make the app run over https, we generated a new key and self-signed certificate, and pointed to them as arguments when we run the main app function. This tells socketio to send it over https, with all the security that entails. This can be verified in the browser, which shows information about the encryption and certificate. The only warning the browser gives, is initially, that the certificate is self-signed, which is unavoidable in the context of this assignment. Once an exception is added for that, it will only show the warning in a submenu.
 
-\section{Session Tokens}
+initially, we used cherrypy for SSL, as recommended a tutorial sheet, but this required a whole new library and required the certificate password to be typed in twice. We later discovered socketio had this functionality natively, and made the switch.
+
+\section[Session Tokens]{Session Tokens \bryce}
 
 The way we handled session tokens for this project, was using the built-in session object in flask. With this, flask generates a session token and stores it as a cookie in the user's browser. Flask can then store data associated with that session locally, and access it on a per-user basis
 
-For our approach, when a user signs in, or signs up, we set the "username" property of the session to be the currently loggen in user. We can then check this value anywhere in the code, and quickly obtain whether or not the current user is logged in, and what their username is. When we handle any user-specific request, we defer to the session\_user() function, which will return either the username of the logged in user, or a None object.
+For our approach, when a user signs in, or signs up, we set the "username" property of the session to be the currently logged in user. We can then check this value anywhere in the code, and quickly obtain whether or not the current user is logged in, and what their username is. Whenever we handle any user-specific request, we defer to the session\_user() function, which will return either the username of the logged in user, or a None object.
+
+\section[Case: Malicious Server]{Security Case: Malicious Server \bryce}
+
+For the purposes of this section, we'll assume the worst-case, that the server is entirely malicious, and is actively trying to obtain secret information (but not stopping communication entirely, as then the server always wins)
+
+Under this case, the server retains the raw login credentials sent to it. The server must not be allowed to read user's messages, requiring that they be a step more secure than the login credentials.
+
+When the user logs in, the client generates \skey from the original password, and instead uses a pre-hash of the password for authentication. \skey is always generated from the same password and salt, so stays the same between sessions.
+
+The rationale for this comes from the fact that we cannot guarantee the user will permanently store any information themselves except their username and password. We need some secret value the server doesn't know, to encrypt our \rkey to store on the server, for which, we can only use the password. Now we have to authenticate the user without the server possibly knowing their password. The solution to this is to pre-hash the password and use the hash for authentication. The same salt is used fr both \rkey and the password, which doesn't matter, as the salt is there purely to make each user unique to prevent rainbow table attacks.
 
 \section{Work allocation}
 
-For the most part, the two of us worked on whatever we felt like, whenever we felt like it. The division of the work in the end was roughly as follows.
-\newline
+We used a github repository for this project, which can be found here:
 
-\noindent \textbf{BKNI0201}
+https://github.sydney.edu.au/bkni0201/INFO2222-Project
+
+For the most part, the two of us worked on whatever we felt like, whenever we felt like it. The division of the work in the end was roughly as follows:
+
+\textbf{BKNI0201}
 
 \begin{itemize}
 \item Friend request, accept, reject, database storage
 \item Session token and token verification
 \item Https
 \item Password pre-hashing and key generation
-\item Message encryption
+\item Message end-to-end encryption with MAC
+\item Message History
 \end{itemize}
 
-\noindent \textbf{KWAL3204}
+\textbf{KWAL3204}
 
 \begin{itemize}
 \item Password hashing and salting (initial implementation)
-\item Message history database storage
-\item Implemented HMAC to verify message integrity
-\item 
+\item Message history database storage with MAC (initial implementation)
 \end{itemize}
+
+\section{Sources}
+
+The following are the documentation for libraries used for this project, which were relied heavily upon:
+
+https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto
+
+https://flask.palletsprojects.com/en/3.0.x/quickstart/
+
+https://socket.io/docs/v3/emitting-events/
+
+https://www.npmjs.com/package/bcryptjs
+
+These are sites referred to in tutorials, which were used to create the SSL certificate and initially run our app with SSL
+
+https://deliciousbrains.com/ssl-certificate-authority-for-local-https-development/
+
+https://docs.cherrypy.dev/en/latest/basics.html
+
+Specifications for AES-GCM:
+
+https://csrc.nist.rip/groups/ST/toolkit/BCM/documents/proposedmodes/gcm/gcm-spec.pdf
 
 \end{document}
 

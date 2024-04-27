@@ -89,13 +89,13 @@ class Room():
             return None
         return self.users[user]
     
-    # gets the room id for a friendship, O(1)
+    # gets the room id for a friendship
     def get_friend_room_id(self, friend: int):
         if friend not in self.friends.keys():
             return None
         return self.friends[friend]
 
-    # gets the friendship id from a given room number, O(n)
+    # gets the friendship id from a given room number
     def get_friend_from_room(self, room_id):
         for i in self.friends:
             if self.friends[i] == room_id:
